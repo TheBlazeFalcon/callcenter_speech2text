@@ -8,7 +8,7 @@ The project is organized into modular components for easier maintenance and prom
 
 -   `gemini_transcribe.py`: Transcribes audio using Google Gemini.
 -   `openai_transcribe.py`: Transcribes audio using OpenAI (Whisper + GPT-4o).
--   `gemini_all_agent_assess.py`: Agent performance QA using Gemini.
+-   `gemini_call_agent_assess.py`: Agent performance QA using Gemini.
 -   `openai_call_agent_assess.py`: Agent performance QA using OpenAI.
 -   `gemini_project_assess.py`: In-depth project assessment using multiple prompts (Gemini).
 -   `openai_project_assess.py`: In-depth project assessment using multiple prompts (OpenAI).
@@ -38,7 +38,7 @@ Evaluate the call agent's performance based on the transcript.
 
 ```bash
 # Using Gemini
-python gemini_all_agent_assess.py "transcript.docx"
+python gemini_call_agent_assess.py "transcript.docx"
 
 # Using OpenAI
 python openai_call_agent_assess.py "outputs/transcript.docx"
