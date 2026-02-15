@@ -6,7 +6,7 @@ from typing import Tuple
 import google.generativeai as genai
 from dotenv import load_dotenv
 
-from utils import read_docx, save_docx
+from utils import read_docx, save_json, clean_markdown
 from prompt_manager import load_prompt
 
 # Load environmental variables from .env file
@@ -56,7 +56,7 @@ def main():
     os.makedirs("outputs", exist_ok=True)
     if not args.output:
         base_name = os.path.splitext(os.path.basename(args.docx_path))[0]
-        args.output = os.path.join("outputs", f"{base_name}_assessment.docx")
+        args.output = os.path.join("outputs", f"{base_name}_assessment.json")
     else:
         # If user provides a path but it's just a filename, put it in outputs
         if not os.path.dirname(args.output):
@@ -75,11 +75,29 @@ def main():
 
     analysis, a_time, a_cost = assess_agent_performance(transcript_text)
     
-    save_docx(None, analysis, args.output, 'Agent Performance Assessment')
+    # Clean and parse JSON
+    json_text = clean_markdown(analysis)
+    import json
+    try:
+        data = json.loads(json_text)
+        
+        # Save JSON
+        save_json(json_text, args.output)
+        
+        # Save Docx (replace .json with .docx in path)
+        docx_output = args.output.replace('.json', '.docx')
+        from utils import save_assessment_docx
+        save_assessment_docx(data, docx_output)
+        
+        success_msg = f"Assessment saved to {args.output} and {docx_output}"
+    except Exception as e:
+        print(f"Warning: Could not parse assessment as JSON for Docx generation: {e}")
+        save_json(json_text, args.output)
+        success_msg = f"Assessment saved to {args.output} (JSON only)"
     
     total_time = time.time() - total_start
     print("-" * 40)
-    print(f"SUCCESS: Assessment saved to {args.output}")
+    print(f"SUCCESS: {success_msg}")
     print(f"Total Time: {total_time:.2f}s | Est. Assessment Cost: ${a_cost:.6f}")
     print("-" * 40)
 

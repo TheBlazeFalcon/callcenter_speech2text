@@ -63,6 +63,44 @@ def get_audio_duration(file_path: str) -> float:
     except Exception:
         return 0.0
 
+def save_assessment_docx(assessment_data: dict, output_path: str):
+    """Saves agent assessment data (from JSON dict) to a Word document."""
+    doc = Document()
+    doc.add_heading('Agent Performance Assessment', 0)
+    
+    # 1. Summary
+    doc.add_heading('Call Summary', level=1)
+    doc.add_paragraph(assessment_data.get('call_summary', 'No summary provided.'))
+    
+    # 2. Performance Table
+    doc.add_heading('Performance Evaluation', level=1)
+    table = doc.add_table(rows=1, cols=2)
+    table.style = 'Table Grid'
+    hdr_cells = table.rows[0].cells
+    hdr_cells[0].text = 'Criterion'
+    hdr_cells[1].text = 'Rating'
+    
+    performance = assessment_data.get('agent_performance', {})
+    for criterion, rating in performance.items():
+        row_cells = table.add_row().cells
+        # Humanize criterion name
+        criterion_name = criterion.replace('_', ' ').capitalize()
+        row_cells[0].text = criterion_name
+        row_cells[1].text = str(rating)
+    
+    # 3. Final Verdict
+    doc.add_heading('Final Verdict', level=1)
+    verdict = assessment_data.get('final_verdict', 'N/A')
+    p = doc.add_paragraph()
+    run = p.add_run(verdict)
+    run.bold = True
+    if verdict == 'Excellent':
+        run.font.color.rgb = (0, 128, 0) # Green
+    elif verdict == 'Poor':
+        run.font.color.rgb = (255, 0, 0) # Red
+        
+    doc.save(output_path)
+
 def format_timecode(seconds: float) -> str:
     """Formats seconds into [HH:MM:SS]."""
     hours = int(seconds // 3600)

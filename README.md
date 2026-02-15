@@ -8,8 +8,8 @@ The project is organized into modular components for easier maintenance and prom
 
 -   `gemini_transcribe.py`: Transcribes audio using Google Gemini.
 -   `openai_transcribe.py`: Transcribes audio using OpenAI (Whisper + GPT-4o).
--   `gemini_assess.py`: Agent performance QA using Gemini.
--   `openai_assess.py`: Agent performance QA using OpenAI.
+-   `gemini_all_agent_assess.py`: Agent performance QA using Gemini.
+-   `openai_call_agent_assess.py`: Agent performance QA using OpenAI.
 -   `gemini_project_assess.py`: In-depth project assessment using multiple prompts (Gemini).
 -   `openai_project_assess.py`: In-depth project assessment using multiple prompts (OpenAI).
 -   `utils.py`: Shared utilities for document processing and cost tracking.
@@ -38,12 +38,12 @@ Evaluate the call agent's performance based on the transcript.
 
 ```bash
 # Using Gemini
-python gemini_assess.py "transcript.docx"
+python gemini_all_agent_assess.py "transcript.docx"
 
 # Using OpenAI
-python openai_assess.py "outputs/transcript.docx"
+python openai_call_agent_assess.py "outputs/transcript.docx"
 ```
-*Outputs (saved in `outputs/`): `<filename>_assessment.docx`*
+*Outputs (saved in `outputs/`): `<filename>_assessment.json`*
 
 ### 3. Project Assessment
 Extract qualitative data and project notations in JSON format.
