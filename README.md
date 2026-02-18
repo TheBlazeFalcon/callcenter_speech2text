@@ -1,65 +1,63 @@
-# Speech-to-Text & Analysis Tool
+# Falcon Call AI 🦅
 
-A modular Python-based toolset for transcribing audio and performing multi-layered analysis using OpenAI and Google Gemini.
+**Falcon Call AI** is a premium, enterprise-grade platform for transcribing and analyzing Moroccan Darija audio recordings and scripts. Leveraging a modular architecture with Google Gemini 1.5 and OpenAI (Whisper + GPT-4o), it delivers deep, actionable insights into call agent performance and project-level metrics.
 
-## Project Structure
+## 🏗 Modular Architecture
 
-The project is organized into modular components for easier maintenance and prompt discovery:
+The system is built on a service-oriented backend for maximum reliability and scalability:
 
--   `gemini_transcribe.py`: Transcribes audio using Google Gemini.
--   `openai_transcribe.py`: Transcribes audio using OpenAI (Whisper + GPT-4o).
--   `gemini_call_agent_assess.py`: Agent performance QA using Gemini.
--   `openai_call_agent_assess.py`: Agent performance QA using OpenAI.
--   `gemini_project_assess.py`: In-depth project assessment using multiple prompts (Gemini).
--   `openai_project_assess.py`: In-depth project assessment using multiple prompts (OpenAI).
--   `utils.py`: Shared utilities for document processing and cost tracking.
--   `prompt_manager.py`: Centralized logic for loading prompts from the `prompts/` folder.
--   `prompts/`: Organized directory for all AI instructions.
-    -   `transcription/`: Formatting and language instructions.
-    -   `agent_assessment/`: Quality assurance criteria.
-    -   `project_assessment/`: Qualitative data and notation scoring.
+- **`backend/`**: Modular FastAPI application.
+  - **`services/`**: Unified logic for Transcription, Intelligence Assessment, and Multi-format Export.
+  - **`core/`**: Centralized prompt management, currency orchestration, and document utilities.
+- **`frontend/`**: High-performance React dashboard (Vite + Tailwind CSS).
+- **`prompts/`**: Versioned AI persona and assessment configurations.
+- **`audio/` & `outputs/`**: Secure storage for input assets and generated intelligence.
 
-## Usage
+## 🚀 Quick Start (Docker)
 
-### 1. Transcription
-Generate a Word document transcript from an audio file.
+1. **Configure Environment**: 
+   Create a `.env` file in the root:
+   ```env
+   OPENAI_API_KEY=your_key_here
+   GEMINI_API_KEY=your_key_here
+   ```
 
+2. **Launch Ecosystem**:
+   ```bash
+   docker compose up --build
+   ```
+
+3. **Dashboard Access**:
+   Navigate to [http://localhost:8000](http://localhost:8000).
+
+## ✨ Core Features
+
+- **Intelligence Metrics**: Real-time tracking of Call Duration, Analysis Time, and Session Cost (MAD).
+- **Dual-Input Pipeline**: Native support for processing raw audio assets or existing `.docx` scripts.
+- **Hybrid AI Engine**: Seamless switching between Google Gemini and OpenAI GPT-4o models.
+- **Automated QA**: Comprehensive qualitative and quantitative scoring of agent interactions.
+- **Professional Export**: Consolidated multi-tab Excel workbooks and narrative Word reports.
+- **Modern UI**: Dark-mode-first aesthetic with dynamic progress orchestration.
+
+## 🛠 Developer Guide
+
+### Backend Services
 ```bash
-# Using Gemini
-python gemini_transcribe.py "audio/file.mp3"
+# Setup environment
+python -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
 
-# Using OpenAI
-python openai_transcribe.py "audio/file.mp3"
+# Launch dev server
+uvicorn backend.main:app --reload
 ```
-*Outputs (saved in `outputs/`): `<filename>_gemini.docx` or `<filename>_openai.docx`*
 
-### 2. Agent Assessment
-Evaluate the call agent's performance based on the transcript.
-
+### Frontend Assets
 ```bash
-# Using Gemini
-python gemini_call_agent_assess.py "transcript.docx"
-
-# Using OpenAI
-python openai_call_agent_assess.py "outputs/transcript.docx"
+cd frontend
+npm install
+npm run dev
 ```
-*Outputs (saved in `outputs/`): `<filename>_assessment.json`*
 
-### 3. Project Assessment
-Extract qualitative data and project notations in JSON format.
-
-```bash
-# Using Gemini
-python gemini_project_assess.py "transcript.docx"
-
-# Using OpenAI
-python openai_project_assess.py "outputs/transcript.docx"
-```
-*Outputs (saved in `outputs/`): `<filename>_qualitative.json` and `<filename>_notations.json`*
-
-## Features
-
--   **Modular Engine**: Easily switch between OpenAI and Gemini for any task.
--   **Prompt Management**: Prompts are stored in external files for easy editing and discovery.
--   **Strict JSON Output**: Project assessment scripts provide clean JSON for downstream processing.
--   **Cost Tracking**: Integrated estimated cost reporting for all API calls.
+---
+*Falcon Call AI - Precision Transcription. Intelligent Assessment. Real-time Analytics.*

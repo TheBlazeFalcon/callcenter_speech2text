@@ -4,3 +4,9 @@ python-dotenv
 mutagen
 tiktoken
 google-generativeai
+fastapi
+uvicorn
+python-multipart
+pandas
+openpyxl
+aiofiles
