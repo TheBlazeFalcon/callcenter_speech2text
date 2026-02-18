@@ -1,11 +1,26 @@
 services:
   app:
     build: .
-    ports:
-      - "8000:8000"
+    image: speech2text:latest
+    restart: always
     env_file:
       - .env
+    environment:
+      - PORT=8000
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.speech2text.rule=Host(`${DOMAIN:-localhost}`)"
+      - "traefik.http.routers.speech2text.entrypoints=websecure"
+      - "traefik.http.routers.speech2text.tls.certresolver=letsencrypt"
+      - "traefik.http.services.speech2text.loadbalancer.server.port=8000"
     volumes:
       - ./audio:/app/audio
       - ./outputs:/app/outputs
-    restart: always
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8000/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    ports:
+      - "${PORT:-8000}:8000"

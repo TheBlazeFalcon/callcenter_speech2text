@@ -1,0 +1,23 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.env
+venv/
+.venv/
+.pytest_cache/
+
+# Node
+node_modules/
+frontend/node_modules/
+
+# Application Data
+audio/
+outputs/
+
+# OS
+.DS_Store

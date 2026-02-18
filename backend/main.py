@@ -25,6 +25,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.get("/health")
+async def health_check():
+    return {"status": "healthy"}
+
 AUDIO_DIR = "audio"
 OUTPUTS_DIR = "outputs"
 os.makedirs(AUDIO_DIR, exist_ok=True)
