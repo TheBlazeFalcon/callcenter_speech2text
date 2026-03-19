@@ -7,6 +7,7 @@ services:
       - .env
     environment:
       - PORT=8000
+      - DB_HOST=db
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.speech2text.rule=Host(`${DOMAIN:-localhost}`)"
@@ -24,3 +25,20 @@ services:
       start_period: 40s
     ports:
       - "${PORT:-8000}:8000"
+    depends_on:
+      - db
+
+  db:
+    image: postgres:16-alpine
+    restart: always
+    environment:
+      - POSTGRES_USER=${DB_USER:-postgres}
+      - POSTGRES_PASSWORD=${DB_PASSWORD:-postgres}
+      - POSTGRES_DB=${DB_NAME:-falconcall}
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:

@@ -1,22 +1,32 @@
-import { Phone, Users, TrendingUp, FolderKanban, ArrowUpRight, ArrowDownRight } from "lucide-react";
-import { dashboardStats, calls } from "@/lib/mock-data";
-import { Badge } from "@/components/ui/badge";
-import { Link } from "react-router-dom";
-
-const statCards = [
-  { label: "Total Calls", value: dashboardStats.totalCalls.toLocaleString(), trend: dashboardStats.callsTrend, icon: Phone, up: true },
-  { label: "Active Agents", value: dashboardStats.activeAgents, trend: "+2", icon: Users, up: true },
-  { label: "Avg Score", value: dashboardStats.avgScore, trend: dashboardStats.scoreTrend, icon: TrendingUp, up: true },
-  { label: "Workspaces", value: dashboardStats.totalWorkspaces, trend: "0", icon: FolderKanban, up: false },
-];
-
-const statusColor: Record<string, string> = {
-  completed: "bg-success/20 text-success border-success/30",
-  processing: "bg-warning/20 text-warning border-warning/30",
-  pending: "bg-muted text-muted-foreground border-border",
-};
+import { Phone, Users, TrendingUp, FolderKanban, Loader2 } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 
 const Dashboard = () => {
+  const { data: stats, isLoading: statsLoading } = useQuery({
+    queryKey: ["dashboard-stats"],
+    queryFn: async () => {
+      const res = await fetch("/api/stats");
+      return res.json();
+    }
+  });
+
+  const { data: outputFiles, isLoading: filesLoading } = useQuery({
+    queryKey: ["output-files"],
+    queryFn: async () => {
+      const res = await fetch("/api/outputs");
+      const { files } = await res.json();
+      return files;
+    }
+  });
+
+  const isLoading = statsLoading || filesLoading;
+
+  const statCards = [
+    { label: "Total Calls", value: stats?.totalCalls || 0, trend: stats?.callsTrend || "0%", icon: Phone, up: true },
+    { label: "Active Agents", value: stats?.activeAgents || 0, trend: "+0", icon: Users, up: true },
+    { label: "Avg Score", value: stats?.avgScore || 0, trend: stats?.scoreTrend || "0%", icon: TrendingUp, up: true },
+    { label: "Workspaces", value: stats?.totalWorkspaces || 0, trend: "0", icon: FolderKanban, up: false },
+  ];
   return (
     <div className="space-y-8">
       <div>
@@ -31,49 +41,43 @@ const Dashboard = () => {
               <span className="text-sm text-muted-foreground">{s.label}</span>
               <s.icon className="w-4 h-4 text-muted-foreground" />
             </div>
-            <div className="text-2xl font-bold">{s.value}</div>
+            {isLoading ? (
+               <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+            ) : (
+              <div className="text-2xl font-bold">{s.value}</div>
+            )}
             <div className="flex items-center gap-1 mt-1 text-xs">
-              {s.up ? <ArrowUpRight className="w-3 h-3 text-success" /> : <ArrowDownRight className="w-3 h-3 text-muted-foreground" />}
-              <span className={s.up ? "text-success" : "text-muted-foreground"}>{s.trend}</span>
-              <span className="text-muted-foreground">vs last month</span>
+              <span className="text-muted-foreground">Updated in real-time</span>
             </div>
           </div>
         ))}
       </div>
 
       <div className="glass-card p-6">
-        <h2 className="text-lg font-semibold mb-4">Recent Transcriptions</h2>
+        <h2 className="text-lg font-semibold mb-4">Recent Output Files</h2>
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-border/50 text-muted-foreground">
-                <th className="text-left py-3 px-2 font-medium">Title</th>
-                <th className="text-left py-3 px-2 font-medium">Agent</th>
-                <th className="text-left py-3 px-2 font-medium hidden md:table-cell">Workspace</th>
-                <th className="text-left py-3 px-2 font-medium hidden sm:table-cell">Duration</th>
-                <th className="text-left py-3 px-2 font-medium">Status</th>
-                <th className="text-right py-3 px-2 font-medium">Score</th>
-              </tr>
-            </thead>
-            <tbody>
-              {calls.slice(0, 5).map((t) => (
-                <tr key={t.id} className="border-b border-border/30 hover:bg-secondary/30 transition-colors">
-                  <td className="py-3 px-2 font-medium">
-                    <Link to={`/dashboard/calls/${t.id}`} className="hover:text-primary transition-colors">{t.title}</Link>
-                  </td>
-                  <td className="py-3 px-2 text-muted-foreground">{t.agent}</td>
-                  <td className="py-3 px-2 text-muted-foreground hidden md:table-cell">{t.workspaceId}</td>
-                  <td className="py-3 px-2 text-muted-foreground hidden sm:table-cell">{t.duration}</td>
-                  <td className="py-3 px-2">
-                    <Badge variant="outline" className={statusColor[t.status]}>
-                      {t.status}
-                    </Badge>
-                  </td>
-                  <td className="py-3 px-2 text-right font-semibold">{t.score > 0 ? t.score : "—"}</td>
+          {isLoading ? (
+            <div className="flex justify-center p-8"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>
+          ) : (
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border/50 text-muted-foreground">
+                  <th className="text-left py-3 px-2 font-medium">Filename</th>
+                  <th className="text-right py-3 px-2 font-medium">Action</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {outputFiles?.map((file: string) => (
+                  <tr key={file} className="border-b border-border/30 hover:bg-secondary/30 transition-colors">
+                    <td className="py-3 px-2 font-medium">{file}</td>
+                    <td className="py-3 px-2 text-right">
+                      <a href={`/api/download/${file}`} download className="text-primary hover:underline font-medium">Download</a>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
       </div>
     </div>

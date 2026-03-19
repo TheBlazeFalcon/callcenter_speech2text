@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
-import { ArrowLeft, Search, Upload } from "lucide-react";
-import { calls, workspaces } from "@/lib/mock-data";
+import { ArrowLeft, Search, Upload, Loader2, Phone } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,6 +15,23 @@ import {
 } from "@/components/ui/dialog";
 import FileUpload from "@/components/FileUpload";
 
+interface Call {
+  id: number;
+  title: string;
+  filename: string;
+  status: string;
+  duration: string;
+  date: string;
+  agent: string;
+  score: number;
+}
+
+interface Workspace {
+  id: number;
+  name: string;
+  description: string;
+}
+
 const statusColor: Record<string, string> = {
   completed: "bg-success/20 text-success border-success/30",
   processing: "bg-warning/20 text-warning border-warning/30",
@@ -27,17 +44,41 @@ const WorkspaceDetail = () => {
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [search, setSearch] = useState("");
 
-  const workspace = workspaces.find((w) => w.id === id);
-  const workspaceCalls = calls.filter((c) => c.workspaceId === id);
-  const filteredCalls = workspaceCalls.filter(
+  const { data: workspace, isLoading: wsLoading } = useQuery<Workspace>({
+    queryKey: ["workspace", id],
+    queryFn: async () => {
+      const res = await fetch(`/api/workspaces/${id}`);
+      if (!res.ok) throw new Error("Workspace not found");
+      return res.json();
+    },
+  });
+
+  const { data: calls, isLoading: callsLoading } = useQuery<Call[]>({
+    queryKey: ["workspace-calls", id],
+    queryFn: async () => {
+      const res = await fetch(`/api/workspaces/${id}/calls`);
+      if (!res.ok) throw new Error("Failed to fetch calls");
+      return res.json();
+    },
+  });
+
+  const filteredCalls = calls?.filter(
     (c) =>
       c.title.toLowerCase().includes(search.toLowerCase()) ||
       c.agent.toLowerCase().includes(search.toLowerCase())
   );
 
-  if (!workspace) return <div className="text-muted-foreground">Workspace not found</div>;
+  if (wsLoading || callsLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
-  const handleUploadComplete = (taskId: string) => {
+  if (!workspace) return <div className="text-muted-foreground text-center py-20">Workspace not found</div>;
+
+  const handleUploadComplete = (taskId: number) => {
     setIsUploadOpen(false);
     navigate(`/dashboard/calls/${taskId}`);
   };
@@ -50,7 +91,7 @@ const WorkspaceDetail = () => {
         </Button>
         <div>
           <h1 className="text-2xl font-bold">{workspace.name}</h1>
-          <p className="text-muted-foreground">{workspace.description}</p>
+          <p className="text-muted-foreground">{workspace.description || "No description provided."}</p>
         </div>
       </div>
 
@@ -90,12 +131,18 @@ const WorkspaceDetail = () => {
       </div>
 
       <div className="space-y-3">
-        {filteredCalls.length === 0 && (
-          <p className="text-muted-foreground text-sm py-8 text-center">
-            {search ? "No calls match your search." : "No calls yet. Upload your first recording."}
-          </p>
+        {filteredCalls?.length === 0 && (
+          <div className="text-center py-20 bg-secondary/10 rounded-xl border border-dashed border-border">
+            <Phone className="w-12 h-12 text-muted-foreground mx-auto mb-4 opacity-50" />
+            <h3 className="text-lg font-medium">
+              {search ? "No calls match your search" : "No calls yet"}
+            </h3>
+            <p className="text-muted-foreground">
+              {search ? "Try adjusting your filters" : "Upload your first recording to get started."}
+            </p>
+          </div>
         )}
-        {filteredCalls.map((c) => (
+        {filteredCalls?.map((c) => (
           <Link
             key={c.id}
             to={`/dashboard/calls/${c.id}`}

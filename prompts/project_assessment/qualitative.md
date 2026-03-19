@@ -143,12 +143,20 @@ Oui | Non
 
 ---
 
+### Project Summary
+
+- project_summary
+  A concise, 2-3 sentence summary of the project, its goals, and its current status.
+
+---
+
 ## JSON OUTPUT SCHEMA (MANDATORY)
 
 Return ONLY valid JSON matching exactly this structure:
 
 {
   "project": "string",
+  "project_summary": "string",
   "problem_validation": {
     "problem_validated": "Oui|Non|En cours de validation|null"
   },

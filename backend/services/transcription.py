@@ -1,7 +1,7 @@
 import os
 import time
 from typing import Tuple, Dict
-import google.generativeai as genai
+from google import genai
 from dotenv import load_dotenv
 
 from backend.core.utils import get_audio_duration, format_timecode, save_docx
@@ -11,12 +11,12 @@ load_dotenv()
 
 class TranscriptionService:
     def __init__(self):
-        genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+        self.client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
         
-        # Pricing constants
+        # Pricing constants (defaulting to current Gemini 1.5 Flash rates)
         self.PRICING = {
-            "gemini-audio": 0.05 / 3600,
-            "gemini-output": 0.40 / 1000000
+            "gemini-audio": float(os.getenv("GEMINI_PRICING_AUDIO", 0.05)) / 3600,
+            "gemini-output": float(os.getenv("GEMINI_PRICING_OUTPUT", 0.40)) / 1000000
         }
 
     def transcribe_with_gemini(self, audio_path: str) -> Dict:
@@ -24,24 +24,25 @@ class TranscriptionService:
         audio_duration = get_audio_duration(audio_path)
         
         try:
-            audio_file = genai.upload_file(path=audio_path)
-            while audio_file.state.name == "PROCESSING":
-                time.sleep(1)
-                audio_file = genai.get_file(audio_file.name)
-
-            if audio_file.state.name == "FAILED":
-                raise Exception("Gemini file processing failed.")
-
-            model = genai.GenerativeModel("models/gemini-flash-latest")
+            audio_file = self.client.files.upload(file=audio_path)
             
-            # 1. Transcription
+            # Use model to generate content
+            # Wait, the new SDK uses client.models.generate_content
+            
+            # Transcription
             transcription_prompt = load_prompt("transcription", "darija_transcription")
-            response = model.generate_content([audio_file, transcription_prompt])
+            response = self.client.models.generate_content(
+                model="gemini-2.5-flash",
+                contents=[audio_file, transcription_prompt]
+            )
             transcript = response.text
             
             # 2. Summarization
             summary_prompt = "Provide a concise summary of this interview including key points and action items."
-            summary_response = model.generate_content([transcript, summary_prompt])
+            summary_response = self.client.models.generate_content(
+                model="gemini-2.5-flash",
+                contents=[transcript, summary_prompt]
+            )
             summary = summary_response.text
 
             # Cost calculation
@@ -50,10 +51,27 @@ class TranscriptionService:
             token_cost = total_tokens * self.PRICING["gemini-output"]
             
             elapsed = time.time() - start_time
-            genai.delete_file(audio_file.name)
+            self.client.files.delete(name=audio_file.name)
+            
+            # Structured dialogue parsing
+            dialogue = []
+            import re
+            for line in transcript.split('\n'):
+                line = line.strip()
+                if not line: continue
+                # Match [HH:MM:SS] Speaker: text or Speaker: text
+                m = re.match(r'(?:\[?(\d+:\d+:\d+|\d+:\d+)\]?\s*)?(Speaker\s*[A-Z\d]+|Agent|Customer|Client|Admin)\s*:\s*(.*)', line, re.IGNORECASE)
+                if m:
+                    time_str, speaker, text = m.groups()
+                    dialogue.append({
+                        "time": time_str or "00:00",
+                        "speaker": speaker,
+                        "text": text
+                    })
             
             return {
                 "transcript": transcript,
+                "dialogue": dialogue,
                 "summary": summary,
                 "elapsed": elapsed,
                 "cost": (audio_cost + token_cost),

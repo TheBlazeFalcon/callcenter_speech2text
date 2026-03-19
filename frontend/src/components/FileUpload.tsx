@@ -1,13 +1,19 @@
 import React, { useState, useCallback } from "react";
 import { Upload, File, X, CheckCircle2, AlertCircle } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 
 interface FileUploadProps {
-  workspaceId: string;
+  workspaceId: number;
   workspaceName: string;
-  onUploadComplete?: (taskId: string) => void;
+  onUploadComplete?: (taskId: number) => void;
+}
+
+interface Agent {
+  id: number;
+  name: string;
 }
 
 type UploadState = "idle" | "uploading" | "processing" | "done" | "error";
@@ -17,8 +23,24 @@ const FileUpload = ({ workspaceId, workspaceName, onUploadComplete }: FileUpload
   const [file, setFile] = useState<File | null>(null);
   const [state, setState] = useState<UploadState>("idle");
   const [progress, setProgress] = useState(0);
-  const [agentName, setAgentName] = useState("");
+  const [agentId, setAgentId] = useState("");
+  const [projectId, setProjectId] = useState("");
+  const [analyses, setAnalyses] = useState<string[]>([
+    "transcript",
+    "summary",
+    "project_analysis",
+    "agent_performance",
+  ]);
   const [errorMsg, setErrorMsg] = useState("");
+
+  const { data: agents } = useQuery<Agent[]>({
+    queryKey: ["agents"],
+    queryFn: async () => {
+      const res = await fetch("/api/agents");
+      if (!res.ok) throw new Error("Failed to fetch agents");
+      return res.json();
+    },
+  });
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -42,8 +64,14 @@ const FileUpload = ({ workspaceId, workspaceName, onUploadComplete }: FileUpload
     if (selected) setFile(selected);
   };
 
+  const toggleAnalysis = (type: string) => {
+    setAnalyses((prev) =>
+      prev.includes(type) ? prev.filter((a) => a !== type) : [...prev, type]
+    );
+  };
+
   const startUpload = async () => {
-    if (!file) return;
+    if (!file || !agentId) return;
     setErrorMsg("");
 
     try {
@@ -62,14 +90,19 @@ const FileUpload = ({ workspaceId, workspaceName, onUploadComplete }: FileUpload
       setState("processing");
       setProgress(50);
 
+      // Find agent name for metadata
+      const selectedAgent = agents?.find(a => a.id === Number(agentId));
+
       const processRes = await fetch("/api/process", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           filename,
-          project_id: workspaceId,
+          project_id: projectId || String(workspaceId),
           project_name: workspaceName,
-          agent_name: agentName || "Unknown Agent",
+          agent_name: selectedAgent?.name || "Unknown Agent",
+          agent_id: agentId ? Number(agentId) : null,
+          analyses,
           skip_transcription: false,
         }),
       });
@@ -79,20 +112,27 @@ const FileUpload = ({ workspaceId, workspaceName, onUploadComplete }: FileUpload
 
       // Step 3: Poll for completion
       const poll = setInterval(async () => {
-        const statusRes = await fetch(`/api/status/${task_id}`);
-        const status = await statusRes.json();
+        try {
+          const statusRes = await fetch(`/api/status/${task_id}`);
+          const status = await statusRes.json();
 
-        if (status.status === "completed") {
+          if (status.status === "completed") {
+            clearInterval(poll);
+            setProgress(100);
+            setState("done");
+            setTimeout(() => onUploadComplete?.(task_id), 800);
+          } else if (status.status === "failed") {
+            clearInterval(poll);
+            setState("error");
+            setErrorMsg(status.error || "Processing failed");
+          } else {
+            // Creep progress during processing
+            setProgress((p) => Math.min(p + 5, 90));
+          }
+        } catch (pollErr) {
           clearInterval(poll);
-          setProgress(100);
-          setState("done");
-          setTimeout(() => onUploadComplete?.(task_id), 800);
-        } else if (status.status === "failed") {
-          clearInterval(poll);
-          throw new Error(status.error || "Processing failed");
-        } else {
-          // Creep progress during processing
-          setProgress((p) => Math.min(p + 5, 90));
+          setState("error");
+          setErrorMsg("Failed to check processing status");
         }
       }, 2000);
     } catch (err: unknown) {
@@ -105,7 +145,7 @@ const FileUpload = ({ workspaceId, workspaceName, onUploadComplete }: FileUpload
     setFile(null);
     setState("idle");
     setProgress(0);
-    setAgentName("");
+    setAgentId("");
     setErrorMsg("");
   };
 
@@ -169,17 +209,72 @@ const FileUpload = ({ workspaceId, workspaceName, onUploadComplete }: FileUpload
           </div>
 
           {state === "idle" && (
-            <div className="space-y-2">
-              <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-                Agent Name (optional)
-              </label>
-              <input
-                type="text"
-                value={agentName}
-                onChange={(e) => setAgentName(e.target.value)}
-                placeholder="e.g. Sarah Chen"
-                className="w-full px-3 py-2 text-sm rounded-lg bg-secondary/30 border border-border/50 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-              />
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                    Select Agent
+                  </label>
+                  <select
+                    className="w-full px-3 py-2 text-sm rounded-lg bg-secondary/30 border border-border/50 text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                    value={agentId}
+                    onChange={(e) => setAgentId(e.target.value)}
+                  >
+                    <option value="">Select an agent...</option>
+                    {agents?.map(a => (
+                      <option key={a.id} value={a.id}>{a.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                    Project ID
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="External ID..."
+                    className="w-full px-3 py-2 text-sm rounded-lg bg-secondary/30 border border-border/50 text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                    value={projectId}
+                    onChange={(e) => setProjectId(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-3 pt-2">
+                <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+                  <div className="w-1 h-3 bg-primary rounded-full" />
+                  Select Analysis Options
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { id: "transcript", label: "Transcript" },
+                    { id: "summary", label: "Agent Summary" },
+                    { id: "project_analysis", label: "Project Assessment" },
+                    { id: "agent_performance", label: "Performance Score" },
+                  ].map((type) => (
+                    <div 
+                      key={type.id}
+                      onClick={() => toggleAnalysis(type.id)}
+                      className={cn(
+                        "flex items-center gap-2 px-3 py-2.5 rounded-xl border-2 cursor-pointer transition-all active:scale-95",
+                        analyses.includes(type.id)
+                          ? "bg-primary/5 border-primary shadow-sm text-primary"
+                          : "bg-secondary/10 border-transparent text-muted-foreground hover:bg-secondary/20"
+                      )}
+                    >
+                      <div className={cn(
+                        "w-4 h-4 rounded-full border-2 flex items-center justify-center transition-colors",
+                        analyses.includes(type.id) ? "border-primary bg-primary" : "border-muted-foreground/30"
+                      )}>
+                        {analyses.includes(type.id) && (
+                          <div className="w-1.5 h-1.5 rounded-full bg-white shadow-sm" />
+                        )}
+                      </div>
+                      <span className="text-xs font-semibold">{type.label}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
           )}
 
@@ -198,7 +293,11 @@ const FileUpload = ({ workspaceId, workspaceName, onUploadComplete }: FileUpload
           )}
 
           {state === "idle" && (
-            <Button className="w-full gradient-bg text-primary-foreground" onClick={startUpload}>
+            <Button 
+                className="w-full gradient-bg text-primary-foreground" 
+                onClick={startUpload}
+                disabled={!agentId}
+            >
               Start Analysis
             </Button>
           )}

@@ -1,63 +1,52 @@
 # Falcon Call AI 🦅
 
-**Falcon Call AI** is a premium, enterprise-grade platform for transcribing and analyzing Moroccan Darija audio recordings and scripts. Leveraging a modular architecture with Google Gemini 1.5 and OpenAI (Whisper + GPT-4o), it delivers deep, actionable insights into call agent performance and project-level metrics.
-
-## 🏗 Modular Architecture
-
-The system is built on a service-oriented backend for maximum reliability and scalability:
-
-- **`backend/`**: Modular FastAPI application.
-  - **`services/`**: Unified logic for Transcription, Intelligence Assessment, and Multi-format Export.
-  - **`core/`**: Centralized prompt management, currency orchestration, and document utilities.
-- **`frontend/`**: High-performance React dashboard (Vite + Tailwind CSS).
-- **`prompts/`**: Versioned AI persona and assessment configurations.
-- **`audio/` & `outputs/`**: Secure storage for input assets and generated intelligence.
-
-## 🚀 Quick Start (Docker)
-
-1. **Configure Environment**: 
-   Create a `.env` file in the root:
-   ```env
-   OPENAI_API_KEY=your_key_here
-   GEMINI_API_KEY=your_key_here
-   ```
-
-2. **Launch Ecosystem**:
-   ```bash
-   docker compose up --build
-   ```
-
-3. **Dashboard Access**:
-   Navigate to [http://localhost:8000](http://localhost:8000).
+**Falcon Call AI** is an advanced intelligence platform for transcribing and analyzing call center interactions. Powered by **Google Gemini 1.5**, it provides modular, deep actionable insights through automated transcription, project-level qualitative assessments, and agent performance scoring.
 
 ## ✨ Core Features
 
-- **Intelligence Metrics**: Real-time tracking of Call Duration, Analysis Time, and Session Cost (MAD).
-- **Dual-Input Pipeline**: Native support for processing raw audio assets or existing `.docx` scripts.
-- **Hybrid AI Engine**: Seamless switching between Google Gemini and OpenAI GPT-4o models.
-- **Automated QA**: Comprehensive qualitative and quantitative scoring of agent interactions.
-- **Professional Export**: Consolidated multi-tab Excel workbooks and narrative Word reports.
-- **Modern UI**: Dark-mode-first aesthetic with dynamic progress orchestration.
+- **Gemini 1.5 Intelligence**: Automated transcription and analysis using `gemini-1.5-flash` for high-speed, cost-effective processing.
+- **Modular Analysis Pipeline**: Choose specific analyses during upload, including Transcription, Summary, Project Analysis, and Agent Performance.
+- **Detailed Scorecards**: Comprehensive agent evaluations with behavioral sentiment, tone analysis, and performance metrics.
+- **Contextual Assessments**: Separation between agent-specific performance and project-level qualitative observations.
+- **Workflow-Focused UI**: Modern React dashboard designed for quality control managers and call center leads.
 
-## 🛠 Developer Guide
+## 🚀 Quick Start
 
-### Backend Services
-```bash
-# Setup environment
-python -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
+1. **Configure Environment**:
+   Create a `.env` file in the root:
 
-# Launch dev server
-uvicorn backend.main:app --reload
-```
+   ```env
+   GEMINI_API_KEY=your_key_here
+   INITIAL_ADMIN_EMAIL=admin@falconcall.ai
+   INITIAL_ADMIN_PASSWORD=your_password
+   ```
 
-### Frontend Assets
-```bash
-cd frontend
-npm install
-npm run dev
-```
+2. **Initialize System**:
+   Setup the database schema and seed initial data (Admin, Mouvement workspace, and default agents):
+
+   ```bash
+   PYTHONPATH=. python3 scripts/reset_db.py
+   ```
+
+3. **Launch Application**:
+
+   ```bash
+   # Backend
+   uvicorn backend.main:app --reload
+
+   # Frontend
+   cd frontend
+   npm run dev
+   ```
+
+## 🛠 Project Structure
+
+- **`backend/`**: Modular FastAPI application.
+  - **`core/`**: Database models (SQLAlchemy), auth, and utilities.
+  - **`services/`**: Transcription and Intelligence assessment services.
+- **`frontend/`**: Vite-powered React application with Tailwind CSS.
+- **`scripts/`**: Maintenance and system initialization scripts.
+- **`prompts/`**: Structured AI personas for precise assessments.
 
 ---
-*Falcon Call AI - Precision Transcription. Intelligent Assessment. Real-time Analytics.*
+*Falcon Call AI - Modular Intelligence. Precise Assessment. Real-time Analytics.*

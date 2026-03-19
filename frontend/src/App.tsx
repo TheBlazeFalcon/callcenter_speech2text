@@ -8,6 +8,7 @@ import Workspaces from "./pages/Workspaces";
 import WorkspaceDetail from "./pages/WorkspaceDetail";
 import CallDetail from "./pages/CallDetail";
 import Agents from "./pages/Agents";
+import AgentDetail from "./pages/AgentDetail";
 import Settings from "./pages/Settings";
 
 const queryClient = new QueryClient();
@@ -25,6 +26,7 @@ const App = () => (
           <Route path="workspaces/:id" element={<WorkspaceDetail />} />
           <Route path="calls/:id" element={<CallDetail />} />
           <Route path="agents" element={<Agents />} />
+          <Route path="agents/:id" element={<AgentDetail />} />
           <Route path="settings" element={<Settings />} />
         </Route>
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
