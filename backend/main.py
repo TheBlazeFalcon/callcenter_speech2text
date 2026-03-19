@@ -92,16 +92,20 @@ def run_processing_pipeline(task_id: str, filename: str, metadata: dict):
         assessment_json_path = os.path.join(OUTPUTS_DIR, f"{base_name}_falcon_assessment.json")
         with open(assessment_json_path, "w") as f:
             f.write(assessment["raw_json"])
-        
+
+        # Store assessment data in task for frontend polling
+        tasks[task_id]["assessment_data"] = assessment.get("data", {})
+        tasks[task_id]["base_name"] = base_name
+
         # 3. File Formatting
         tasks[task_id]["step"] = "File Formatting (DOCX & Excel Preparation)"
         export_service.export_to_excel(f"{base_name}_falcon")
-        
+
         total_elapsed = time.time() - start_time_total
         tasks[task_id]["total_time"] = total_elapsed
         tasks[task_id]["cost_usd"] = total_cost_usd
         tasks[task_id]["cost_mad"] = total_cost_usd * 10.12 # Current USD/MAD approx
-        
+
         tasks[task_id]["status"] = "completed"
         tasks[task_id]["step"] = "Finished"
     except Exception as e:
