@@ -10,9 +10,8 @@ RUN npm run build
 FROM python:3.11-slim
 WORKDIR /app
 
-# Install system dependencies for audio processing if needed
+# Install curl for healthcheck
 RUN apt-get update && apt-get install -y \
-    ffmpeg \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
