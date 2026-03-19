@@ -48,14 +48,12 @@ class ProcessRequest(BaseModel):
     project_name: str
     agent_name: str
     skip_transcription: bool = False
-    engine: str = "gemini"
 
 def run_processing_pipeline(task_id: str, filename: str, metadata: dict):
     tasks[task_id]["status"] = "processing"
     audio_path = os.path.join(AUDIO_DIR, filename)
     base_name = os.path.splitext(filename)[0]
     skip_transcription = metadata.get("skip_transcription", False)
-    engine = metadata.get("engine", "gemini")
     
     from backend.core.utils import get_audio_duration
     duration = get_audio_duration(audio_path)
@@ -67,10 +65,7 @@ def run_processing_pipeline(task_id: str, filename: str, metadata: dict):
     try:
         if not skip_transcription:
             tasks[task_id]["step"] = "Transcription Status (Audio to Text)"
-            if engine == "gemini":
-                result = transcription_service.transcribe_with_gemini(audio_path)
-            else:
-                result = transcription_service.transcribe_with_openai(audio_path)
+            result = transcription_service.transcribe_with_gemini(audio_path)
             
             total_cost_usd += result.get("cost", 0.0)
             from backend.core.utils import save_docx
@@ -83,7 +78,7 @@ def run_processing_pipeline(task_id: str, filename: str, metadata: dict):
         
         # 2. Assessment
         tasks[task_id]["step"] = "Analysis Status (Summary & Assessment Generation)"
-        assessment = assessment_service.assess_agent(transcript_file, engine=engine)
+        assessment = assessment_service.assess_agent(transcript_file)
         
         # Approximate assessment cost (standard GPT-4o-mini or Gemini Flash is very low)
         total_cost_usd += 0.005 # Small overhead for assessment
@@ -127,8 +122,7 @@ async def process_file(request: ProcessRequest, background_tasks: BackgroundTask
         "project_id": request.project_id,
         "project_name": request.project_name,
         "agent_name": request.agent_name,
-        "skip_transcription": request.skip_transcription,
-        "engine": request.engine
+        "skip_transcription": request.skip_transcription
     }
     tasks[task_id] = {
         "status": "pending", 
