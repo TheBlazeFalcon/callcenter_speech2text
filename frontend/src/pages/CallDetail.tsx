@@ -6,7 +6,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Label } from "@/components/ui/label";
-import { cn } from "@/lib/utils";
 
 // Types for backend assessment data
 interface BackendAssessment {
@@ -34,7 +33,8 @@ interface TaskStatus {
   step?: string;
   assessment_data?: BackendAssessment;
   base_name?: string;
-  duration?: string;
+  filename?: string;
+  duration?: number;
   cost_usd?: number;
   error?: string;
 }
@@ -132,6 +132,13 @@ const CallDetail = () => {
   }
 
   // ── BACKEND CALL – COMPLETED ──────────────────────────────────────
+  const formatDuration = (s?: number) => {
+    if (s === undefined || s === null) return "—";
+    const mins = Math.floor(s / 60);
+    const secs = Math.floor(s % 60);
+    return `${mins}m ${secs}s`;
+  };
+
   const a = taskStatus.assessment_data || {};
   const baseName = taskStatus.base_name || "";
 
@@ -139,8 +146,8 @@ const CallDetail = () => {
     ? Object.entries(a.agent_performance).filter(([k]) => k !== "overall_score")
     : [];
 
-  const positiveObs = (a.qualitative_observations || []).filter((o) => o.tag === "positive").map((o) => o.text);
-  const negativeObs = (a.qualitative_observations || []).filter((o) => o.tag === "negative" || o.tag === "neutral").map((o) => o.text);
+  const positiveObs = (a.qualitative_observations || []).filter((o) => o?.tag === "positive").map((o) => o.text);
+  const negativeObs = (a.qualitative_observations || []).filter((o) => o?.tag === "negative" || o?.tag === "neutral").map((o) => o.text);
 
   const overallScore = a.agent_performance?.overall_score ?? 0;
   
@@ -152,7 +159,11 @@ const CallDetail = () => {
         const m = line.match(/^\[?(\d+:\d+)\]?\s*(.+?):\s*(.+)/i);
         if (!m) return null;
         const [, time, speaker, text] = m;
-        return { time, speaker: speaker.trim(), text };
+        const cleanedText = text
+          .replace(/\b(ah|uh|mhm|euh|ehm|umm|euhh|ahh|uhh)\b/gi, "")
+          .replace(/\s+/g, " ")
+          .trim();
+        return { time, speaker: speaker.trim(), text: cleanedText };
       })
       .filter(Boolean) as Array<{ time: string; speaker: string; text: string }>;
 
@@ -167,8 +178,12 @@ const CallDetail = () => {
           <Link to="/dashboard/workspaces"><ArrowLeft className="w-4 h-4" /></Link>
         </Button>
         <div className="flex-1">
-          <h1 className="text-xl font-bold truncate">{baseName || "Call Analysis"}</h1>
-          <p className="text-sm text-muted-foreground">{a.final_verdict || ""} · {taskStatus.duration || ""}</p>
+          <h1 className="text-3xl font-black tracking-tight mb-1">{taskStatus.filename}</h1>
+          <p className="text-sm text-muted-foreground font-medium flex items-center gap-2">
+            <span className="px-2 py-0.5 rounded-full bg-primary/10 text-primary font-bold text-[10px] uppercase tracking-wider">{a.final_verdict || "Pending"}</span>
+            <span className="w-1 h-1 rounded-full bg-border" />
+            <span>{formatDuration(taskStatus.duration as number)}</span>
+          </p>
         </div>
         <div className="flex items-center gap-3">
           <div className="text-right">
@@ -185,256 +200,337 @@ const CallDetail = () => {
         </div>
       </div>
 
-      {/* Agent Summary (Executive Summary) */}
-      {a.agent_summary && (
-        <section className="glass-card p-6">
-          <div className="flex items-center gap-2 mb-4 text-primary">
-            <FileText className="w-5 h-5" />
-            <h2 className="text-lg font-semibold">Agent Summary</h2>
-          </div>
-          <p className="text-muted-foreground leading-relaxed">{a.agent_summary}</p>
-        </section>
-      )}
-
-      {/* Project Assessment (Innovation Analysis) */}
+      {/* Project Assessment Section */}
       {(a.project_summary || a.project_data) && (
-        <section className="glass-card overflow-hidden">
-          <div className="p-6 border-b border-border/40 bg-accent/5">
-            <div className="flex items-center justify-between gap-4">
-              <div className="flex items-center gap-2 text-accent">
-                <BarChart3 className="w-5 h-5" />
-                <h2 className="text-lg font-semibold">Project Assessment</h2>
-              </div>
-              {a.project_data?.notation?.category && (
-                <div className="flex items-center gap-3">
-                  <div className="text-right">
-                    <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-tighter">Category</p>
-                    <p className="text-sm font-medium text-accent-foreground">{a.project_data.notation.category_interpretation}</p>
-                  </div>
-                  <div className="w-12 h-12 rounded-xl bg-accent flex items-center justify-center text-2xl font-black text-accent-foreground shadow-lg shadow-accent/20">
-                    {a.project_data.notation.category}
-                  </div>
+        <section className="glass-card shadow-2xl border-accent/30 overflow-hidden">
+          <div className="p-8 border-b border-border/40 bg-accent/5">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2 text-accent">
+                  <BarChart3 className="w-5 h-5" />
+                  <h2 className="text-xl font-bold tracking-tight">Project Assessment</h2>
                 </div>
-              )}
+                {a.project_summary && (
+                  <p className="text-muted-foreground leading-relaxed italic tracking-tight max-w-3xl">"{a.project_summary}"</p>
+                )}
+              </div>
+              
+              <div className="flex items-center gap-4 shrink-0">
+                {a.project_data?.notation?.category && (
+                  <div className="flex items-center gap-3 bg-accent/10 p-3 rounded-2xl border border-accent/20">
+                    <div className="text-right">
+                      <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest mb-0.5">Project Class</p>
+                      <p className="text-xs font-semibold text-accent-foreground truncate max-w-[150px]">{a.project_data.notation.category_interpretation}</p>
+                    </div>
+                    <div className="w-14 h-14 rounded-xl bg-accent flex items-center justify-center text-3xl font-black text-accent-foreground shadow-xl shadow-accent/30">
+                      {a.project_data.notation.category}
+                    </div>
+                  </div>
+                )}
+                <a href={`/api/download/${baseName}_project.csv`} download>
+                  <Button variant="outline" size="sm" className="h-10 text-[10px] px-3 bg-accent/5 hover:bg-accent/10 border-accent/20 uppercase font-bold tracking-widest">
+                    <Download className="w-4 h-4 mr-2" /> Export Project CSV
+                  </Button>
+                </a>
+              </div>
             </div>
-            {a.project_summary && (
-              <p className="text-muted-foreground mt-4 leading-relaxed">{a.project_summary}</p>
-            )}
           </div>
 
-          <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-8">
-            {/* Project Notations */}
-            {a.project_data?.notation && (
-              <div className="space-y-6">
-                <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground/70">Potential Indicators</h3>
-                <div className="grid grid-cols-1 gap-4">
-                  {[
-                    { label: "Idea Potential", value: a.project_data.notation.idea?.idea_potential, color: "bg-blue-500" },
-                    { label: "Team Potential", value: a.project_data.notation.team?.team_potential, color: "bg-purple-500" },
-                    { label: "Pilot Potential", value: a.project_data.notation.pilot?.pilot_potential, color: "bg-orange-500" },
-                  ].map((item) => (
-                    <div key={item.label} className="space-y-1.5">
-                      <div className="flex justify-between text-xs font-medium">
-                        <span>{item.label}</span>
-                        <span>{item.value?.toFixed(1) || "0.0"}/5.0</span>
-                      </div>
-                      <div className="h-2 w-full bg-secondary/30 rounded-full overflow-hidden">
-                        <div 
-                          className={cn("h-full transition-all duration-1000", item.color)} 
-                          style={{ width: `${(item.value || 0) * 20}%` }} 
-                        />
-                      </div>
+          <div className="p-8 space-y-10">
+            {/* Quantitative Potential Indicators */}
+            <div className="space-y-6">
+              <h3 className="text-xs font-black uppercase tracking-[0.2em] text-accent/80 flex items-center gap-2">
+                <span className="w-8 h-[1px] bg-accent/30"></span> Potential Indicators
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                {/* IDEA */}
+                {a.project_data?.notation?.idea && (
+                  <div className="p-5 rounded-2xl bg-blue-500/5 border border-blue-500/10 space-y-5">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-[10px] font-bold uppercase tracking-widest text-blue-400">Idea</h4>
+                      <Badge variant="outline" className="text-[10px] font-mono py-0 h-4 border-blue-500/30 text-blue-400">
+                        {a.project_data.notation.idea.idea_potential?.toFixed(1)}/5
+                      </Badge>
                     </div>
-                  ))}
-                </div>
-                {a.project_data.notation.operational_reading && (
-                  <div className="p-4 rounded-lg bg-accent/5 border border-accent/10">
-                    <h4 className="text-[10px] font-bold text-accent uppercase mb-2">Next Actions</h4>
-                    <p className="text-xs text-muted-foreground italic leading-relaxed">
-                      {a.project_data.notation.operational_reading}
-                    </p>
+                    <div className="space-y-4">
+                      {[
+                        { label: "Clarity", value: a.project_data.notation.idea.criteria?.clarity_of_problem },
+                        { label: "Problem-Fit", value: a.project_data.notation.idea.criteria?.solution_problem_fit },
+                        { label: "Desirability", value: a.project_data.notation.idea.criteria?.desirability },
+                        { label: "Feasibility", value: a.project_data.notation.idea.criteria?.feasibility },
+                        { label: "Potential", value: a.project_data.notation.idea.criteria?.solution_potential },
+                      ].map((item) => (
+                        <div key={item.label} className="space-y-1.5">
+                          <div className="flex justify-between text-[10px] font-bold text-muted-foreground uppercase">
+                            <span>{item.label}</span>
+                            <span className="text-foreground">{item.value || 0}/5</span>
+                          </div>
+                          <Progress value={(item.value || 0) * 20} className="h-1 bg-blue-500/20" />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {/* TEAM */}
+                {a.project_data?.notation?.team && (
+                  <div className="p-5 rounded-2xl bg-purple-500/5 border border-purple-500/10 space-y-5">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-[10px] font-bold uppercase tracking-widest text-purple-400">Team</h4>
+                      <Badge variant="outline" className="text-[10px] font-mono py-0 h-4 border-purple-500/30 text-purple-400">
+                        {a.project_data.notation.team.team_potential?.toFixed(1)}/5
+                      </Badge>
+                    </div>
+                    <div className="space-y-4">
+                      {[
+                        { label: "Complementarity", value: a.project_data.notation.team.criteria?.team_complementarity },
+                        { label: "Founders", value: a.project_data.notation.team.criteria?.founder_potential },
+                      ].map((item) => (
+                        <div key={item.label} className="space-y-1.5">
+                          <div className="flex justify-between text-[10px] font-bold text-muted-foreground uppercase">
+                            <span>{item.label}</span>
+                            <span className="text-foreground">{item.value || 0}/5</span>
+                          </div>
+                          <Progress value={(item.value || 0) * 20} className="h-1 bg-purple-500/20" />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {/* PILOT */}
+                {a.project_data?.notation?.pilot && (
+                  <div className="p-5 rounded-2xl bg-orange-500/5 border border-orange-500/10 space-y-5">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-[10px] font-bold uppercase tracking-widest text-orange-400">Pilot</h4>
+                      <Badge variant="outline" className="text-[10px] font-mono py-0 h-4 border-orange-500/30 text-orange-400">
+                        {a.project_data.notation.pilot.pilot_potential?.toFixed(1)}/5
+                      </Badge>
+                    </div>
+                    <div className="space-y-4">
+                      {[
+                        { label: "Investment", value: a.project_data.notation.pilot.criteria?.investment_for_pilot_score },
+                        { label: "Speed", value: a.project_data.notation.pilot.criteria?.speed_of_pilot_score },
+                      ].map((item) => (
+                        <div key={item.label} className="space-y-1.5">
+                          <div className="flex justify-between text-[10px] font-bold text-muted-foreground uppercase">
+                            <span>{item.label}</span>
+                            <span className="text-foreground">{item.value || 0}/5</span>
+                          </div>
+                          <Progress value={(item.value || 0) * 20} className="h-1 bg-orange-500/20" />
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 )}
               </div>
-            )}
+            </div>
 
-            {/* Qualitative Evaluation */}
-            {a.project_data?.qualitative && (
+            {/* Qualitative Strategic Context */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
               <div className="space-y-6">
-                <h3 className="text-sm font-bold uppercase tracking-wider text-muted-foreground/70">Maturity & Deployment</h3>
-                <div className="grid grid-cols-2 gap-3">
+                <h3 className="text-xs font-black uppercase tracking-[0.2em] text-muted-foreground flex items-center gap-2">
+                  <span className="w-8 h-[1px] bg-border"></span> Strategic & Operational
+                </h3>
+                <div className="grid grid-cols-2 gap-4">
                   {[
-                    { label: "Stage", value: a.project_data.qualitative.solution_evaluation?.situation_stage },
-                    { label: "Status", value: a.project_data.qualitative.overall_situation?.situation_status },
-                    { label: "Pilot Budget", value: a.project_data.qualitative.solution_evaluation?.mvp_budget },
-                    { label: "Lead Time", value: a.project_data.qualitative.solution_evaluation?.mvp_duration },
-                    { label: "Strategic Fit", value: a.project_data.qualitative.strategic_fit?.strategic_fit_ocp === "Oui" ? "Aligned" : "Not Aligned" },
-                    { label: "Team Status", value: a.project_data.qualitative.team_and_skills?.team_status },
-                  ].map((detail) => (
-                    <div key={detail.label} className="p-3 rounded-lg bg-secondary/20 border border-border/40">
-                      <p className="text-[10px] text-muted-foreground uppercase font-semibold mb-1">{detail.label}</p>
-                      <p className="text-xs font-medium truncate">{detail.value || "Not Specified"}</p>
+                    { label: "Maturity", value: a.project_data?.qualitative?.solution_evaluation?.situation_stage, icon: "🎯" },
+                    { label: "Status", value: a.project_data?.qualitative?.overall_situation?.situation_status, icon: "⚡" },
+                    { label: "Validated", value: a.project_data?.qualitative?.problem_validation?.problem_validated, icon: "✅" },
+                    { label: "Users Consulted", value: a.project_data?.qualitative?.solution_evaluation?.customers_consulted, icon: "👥" },
+                    { label: "Strategic Fit", value: a.project_data?.qualitative?.strategic_fit?.strategic_fit_ocp, icon: "💎" },
+                    { label: "Support Path", value: a.project_data?.qualitative?.overall_situation?.support_path, icon: "🚀" },
+                  ].map((item) => (
+                    <div key={item.label} className="p-4 rounded-xl bg-secondary/10 border border-border/40">
+                      <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1">{item.icon} {item.label}</p>
+                      <p className="text-sm font-bold">{item.value || "—"}</p>
                     </div>
                   ))}
                 </div>
               </div>
+
+              <div className="space-y-6">
+                <h3 className="text-xs font-black uppercase tracking-[0.2em] text-muted-foreground flex items-center gap-2">
+                  <span className="w-8 h-[1px] bg-border"></span> Financials & Team
+                </h3>
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="p-5 rounded-2xl bg-indigo-500/5 border border-indigo-500/20">
+                      <p className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-1">MVP Budget</p>
+                      <p className="text-base font-black">{a.project_data?.qualitative?.solution_evaluation?.mvp_budget || "N/A"}</p>
+                    </div>
+                    <div className="p-5 rounded-2xl bg-emerald-500/5 border border-emerald-500/20">
+                      <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest mb-1">Lead Time</p>
+                      <p className="text-base font-black">{a.project_data?.qualitative?.solution_evaluation?.mvp_duration || "N/A"}</p>
+                    </div>
+                  </div>
+                  <div className="p-5 rounded-2xl bg-secondary/20 border border-border/40">
+                    <div className="flex justify-between items-center text-center">
+                      <div className="flex-1">
+                        <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1">Mobility</p>
+                        <p className="text-sm font-bold">{a.project_data?.qualitative?.team_and_skills?.team_status || "—"}</p>
+                      </div>
+                      <div className="w-[1px] h-8 bg-border mx-4" />
+                      <div className="flex-1">
+                        <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-1">Key Skills</p>
+                        <p className="text-sm font-bold">{a.project_data?.qualitative?.team_and_skills?.team_has_key_skills || "—"}</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {a.project_data?.notation?.operational_reading && (
+              <div className="p-6 rounded-2xl bg-accent opacity-95 text-white shadow-xl shadow-accent/30">
+                <div className="flex items-start gap-4">
+                  <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center shrink-0"><Info className="w-5 h-5 text-white" /></div>
+                  <div>
+                    <h4 className="text-[10px] font-black uppercase tracking-widest mb-1 text-white/80">Operational Reading</h4>
+                    <p className="text-sm font-medium leading-relaxed italic">"{a.project_data.notation.operational_reading}"</p>
+                  </div>
+                </div>
+              </div>
             )}
           </div>
         </section>
       )}
 
-      {/* Performance Metrics */}
-      {quantMetrics.length > 0 && (
-        <section className="glass-card p-6">
-          <div className="flex items-center gap-2 mb-6 text-accent">
-            <BarChart3 className="w-5 h-5" />
-            <h2 className="text-lg font-semibold">Performance Metrics</h2>
+      {/* Agent Performance Analysis Section */}
+      {a.agent_summary && (
+        <section className="glass-card shadow-xl border-primary/20 overflow-hidden">
+          <div className="p-8 border-b border-border/40 bg-primary/5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-primary">
+                <UserCheck className="w-5 h-5" />
+                <h2 className="text-xl font-bold tracking-tight">Agent Performance Analysis</h2>
+              </div>
+              <a href={`/api/download/${baseName}_agent.csv`} download>
+                <Button variant="outline" size="sm" className="h-10 text-[10px] px-3 bg-primary/5 hover:bg-primary/10 border-primary/20 uppercase font-bold tracking-widest">
+                  <Download className="w-4 h-4 mr-2" /> Performance CSV
+                </Button>
+              </a>
+            </div>
+            <p className="text-muted-foreground mt-4 leading-relaxed font-medium italic">"{a.agent_summary}"</p>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-            {quantMetrics.map(([key, value]) => {
-              const pct = scoreToPercent(value as string | number);
-              return (
-                <div key={key} className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span className="capitalize text-muted-foreground">{key.replace(/_/g, " ")}</span>
-                    <span className="font-semibold">{pct}/100</span>
-                  </div>
-                  <Progress value={pct} className="h-1.5" />
+
+          <div className="p-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
+              {/* Competency Scores */}
+              <div className="space-y-6">
+                <h3 className="text-xs font-black uppercase tracking-[0.2em] text-muted-foreground flex items-center gap-2">
+                  <span className="w-8 h-[1px] bg-border"></span> Technical Competencies
+                </h3>
+                <div className="grid grid-cols-1 gap-6">
+                  {quantMetrics.map(([key, value]) => {
+                    const pct = scoreToPercent(value as string | number);
+                    return (
+                      <div key={key} className="space-y-2">
+                        <div className="flex justify-between text-[11px] font-bold uppercase tracking-tight text-muted-foreground">
+                          <span>{key.replace(/_/g, " ")}</span>
+                          <span className="text-primary">{pct}/100</span>
+                        </div>
+                        <Progress value={pct} className="h-1.5" />
+                      </div>
+                    );
+                  })}
                 </div>
-              );
-            })}
-          </div>
-        </section>
-      )}
-
-      {/* Behavioral Analysis */}
-      {a.behavioral_analysis && (
-        <section className="glass-card p-6">
-          <div className="flex items-center gap-2 mb-6 text-purple-400">
-            <Tag className="w-5 h-5" />
-            <h2 className="text-lg font-semibold">Behavioral Analysis</h2>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
-            <div className="space-y-4">
-              <div>
-                <Label className="text-xs text-muted-foreground uppercase tracking-wider">Sentiment Index</Label>
-                <div className="text-lg font-medium mt-1">{a.behavioral_analysis.sentiment}</div>
               </div>
-              <div>
-                <Label className="text-xs text-muted-foreground uppercase tracking-wider">Communication Tone</Label>
-                <div className="text-lg font-medium mt-1">{a.behavioral_analysis.tone}</div>
+
+              {/* Behavioral & Sentiment */}
+              <div className="space-y-8">
+                <h3 className="text-xs font-black uppercase tracking-[0.2em] text-muted-foreground flex items-center gap-2">
+                  <span className="w-8 h-[1px] bg-border"></span> Soft Skills & Vibes
+                </h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="p-5 rounded-2xl bg-primary/5 border border-primary/10">
+                    <p className="text-[10px] text-primary uppercase font-bold tracking-widest mb-1">Sentiment</p>
+                    <p className="text-base font-black">{a.behavioral_analysis?.sentiment || "Neutral"}</p>
+                  </div>
+                  <div className="p-5 rounded-2xl bg-primary/5 border border-primary/10 text-right">
+                    <p className="text-[10px] text-primary uppercase font-bold tracking-widest mb-1">Verdict</p>
+                    <p className="text-base font-black">{a.final_verdict || "N/A"}</p>
+                  </div>
+                </div>
+
+                <div className="space-y-6">
+                  {positiveObs.length > 0 && (
+                    <div className="space-y-3">
+                      <h4 className="text-[10px] font-bold text-success uppercase tracking-widest">Key Strengths</h4>
+                      <div className="flex flex-wrap gap-2">
+                        {positiveObs.map((s, i) => <Badge key={i} className="bg-success/10 text-success hover:bg-success/20 border-success/20 py-1">{s}</Badge>)}
+                      </div>
+                    </div>
+                  )}
+                  {negativeObs.length > 0 && (
+                    <div className="space-y-3">
+                      <h4 className="text-[10px] font-bold text-warning uppercase tracking-widest">Development Areas</h4>
+                      <div className="flex flex-wrap gap-2">
+                        {negativeObs.map((s, i) => <Badge key={i} className="bg-warning/10 text-warning hover:bg-warning/20 border-warning/20 py-1">{s}</Badge>)}
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
-            <div>
-              <Label className="text-xs text-muted-foreground uppercase tracking-wider">Key Topics & Keywords</Label>
-              <div className="flex flex-wrap gap-2 mt-2">
-                {a.behavioral_analysis.keywords.map((k) => (
-                  <Badge key={k} variant="secondary" className="bg-secondary/50">{k}</Badge>
-                ))}
-              </div>
-            </div>
           </div>
         </section>
       )}
 
-      {/* Quantitative Data (Call Statistics) */}
-      {a.quantitative && Object.keys(a.quantitative).length > 0 && (
-        <section className="glass-card p-6">
-          <div className="flex items-center gap-2 mb-6 text-indigo-400">
-            <BarChart3 className="w-5 h-5" />
-            <h2 className="text-lg font-semibold">Call Statistics</h2>
-          </div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-            {Object.entries(a.quantitative).map(([key, value]) => (
-              <div key={key} className="p-4 rounded-lg bg-secondary/20 text-center">
-                <div className="text-xs text-muted-foreground uppercase mb-1">{key.replace(/_/g, " ")}</div>
-                <div className="text-lg font-semibold">{String(value)}</div>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
-
-      {/* Transcript */}
+      {/* Transcript Section */}
       {transcriptLines.length > 0 && (
-        <section className="glass-card p-6">
-          <div className="flex items-center gap-2 mb-6 text-blue-400">
-            <MessageSquare className="w-5 h-5" />
-            <h2 className="text-lg font-semibold">Interaction Transcript</h2>
+        <section className="glass-card shadow-xl border-blue-500/20 overflow-hidden">
+          <div className="p-8 border-b border-border/40 bg-blue-500/5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-blue-400">
+                <MessageSquare className="w-5 h-5" />
+                <h2 className="text-xl font-bold tracking-tight">Interaction Transcript</h2>
+              </div>
+              <a href={`/api/download/${baseName}_falcon.docx`} download>
+                <Button variant="outline" size="sm" className="h-10 text-[10px] px-3 bg-blue-500/5 hover:bg-blue-500/10 border-blue-500/20 uppercase font-bold tracking-widest">
+                  <Download className="w-4 h-4 mr-2" /> Download Word
+                </Button>
+              </a>
+            </div>
           </div>
-          <div className="space-y-6 max-h-96 overflow-y-auto pr-2">
-            {transcriptLines.map((line, i) => (
-              <div key={i} className="flex gap-4">
-                <div className="shrink-0 w-16 text-right pt-1">
-                  <span className="text-[10px] font-mono text-muted-foreground">{line.time}</span>
-                </div>
-                <div className="flex-1">
-                  <div className={`text-xs font-bold mb-1 ${line.speaker.toLowerCase().includes('a') || line.speaker.toLowerCase().includes('1') || line.speaker.toLowerCase().includes('agent') ? "text-primary" : "text-accent"}`}>
-                    {line.speaker.toUpperCase()}
+          <div className="p-8">
+            <div className="space-y-8 max-h-[600px] overflow-y-auto pr-6 scrollbar-thin scrollbar-thumb-blue-500/20 scrollbar-track-transparent">
+              {transcriptLines.map((line, i) => {
+                const isAgent = line.speaker.toLowerCase().includes('agent') || line.speaker.toLowerCase().includes('a');
+                return (
+                  <div key={i} className="flex gap-6 group">
+                    <div className="shrink-0 w-16 text-right pt-1 opacity-40 group-hover:opacity-100 transition-opacity">
+                      <span className="text-[10px] font-mono text-muted-foreground">{line.time}</span>
+                    </div>
+                    <div className="flex-1 space-y-2">
+                      <div className={`text-[10px] font-black uppercase tracking-tighter ${isAgent ? "text-primary" : "text-accent"}`}>
+                        {line.speaker}
+                      </div>
+                      <div className={`p-4 rounded-3xl rounded-tl-none border transition-all ${isAgent ? "bg-primary/5 border-primary/10" : "bg-secondary/5 border-border/40"}`}>
+                        <p className="text-sm text-foreground/90 leading-relaxed font-medium">{line.text}</p>
+                      </div>
+                    </div>
                   </div>
-                  <p className="text-sm text-foreground/90 leading-relaxed">{line.text}</p>
-                </div>
-              </div>
-            ))}
+                );
+              })}
+            </div>
           </div>
         </section>
       )}
 
-      {/* Coaching & Feedback */}
-      {(positiveObs.length > 0 || negativeObs.length > 0) && (
-        <section className="glass-card p-6">
-          <div className="flex items-center gap-2 mb-6 text-success">
-            <UserCheck className="w-5 h-5" />
-            <h2 className="text-lg font-semibold">Coaching & Feedback</h2>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            {positiveObs.length > 0 && (
-              <div className="space-y-3">
-                <h3 className="text-sm font-bold text-success/80 uppercase tracking-wider">Key Strengths</h3>
-                <ul className="space-y-2">
-                  {positiveObs.map((s, i) => (
-                    <li key={i} className="text-sm text-muted-foreground flex gap-2">
-                      <span className="text-success">•</span> {s}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-            {negativeObs.length > 0 && (
-              <div className="space-y-3">
-                <h3 className="text-sm font-bold text-warning/80 uppercase tracking-wider">Growth Opportunities</h3>
-                <ul className="space-y-2">
-                  {negativeObs.map((s, i) => (
-                    <li key={i} className="text-sm text-muted-foreground flex gap-2">
-                      <span className="text-warning">•</span> {s}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </div>
-        </section>
-      )}
-
-      {/* Technical Metadata */}
-      <section className="glass-card p-6">
-        <div className="flex items-center gap-2 mb-6 text-muted-foreground">
+      {/* Technical Metadata Section */}
+      <section className="glass-card p-8 border-muted-foreground/10 opacity-70">
+        <div className="flex items-center gap-2 mb-8 text-muted-foreground">
           <Info className="w-5 h-5" />
-          <h2 className="text-lg font-semibold">Technical Metadata</h2>
+          <h2 className="text-sm font-bold uppercase tracking-widest">Infrastructure Logs</h2>
         </div>
-        <div className="grid grid-cols-3 gap-4 text-center">
-          <div className="p-4 rounded-lg bg-secondary/20">
-            <div className="text-xs text-muted-foreground uppercase mb-1">Duration</div>
-            <div className="text-lg font-semibold">{taskStatus.duration || "—"}</div>
-          </div>
-          <div className="p-4 rounded-lg bg-secondary/20">
-            <div className="text-xs text-muted-foreground uppercase mb-1">Cost (USD)</div>
-            <div className="text-lg font-semibold">${taskStatus.cost_usd?.toFixed(4) || "—"}</div>
-          </div>
-          <div className="p-4 rounded-lg bg-secondary/20">
-            <div className="text-xs text-muted-foreground uppercase mb-1">Verdict</div>
-            <div className="text-lg font-semibold">{a.final_verdict || "—"}</div>
-          </div>
+        <div className="grid grid-cols-1 gap-6 max-w-xs">
+          {[
+            { label: "Analysed Audio", value: formatDuration(taskStatus.duration as number) },
+          ].map((item) => (
+            <div key={item.label} className="p-4 rounded-2xl bg-secondary/5 border border-border/20 text-center">
+              <div className="text-[9px] text-muted-foreground uppercase font-black tracking-widest mb-1">{item.label}</div>
+              <div className="text-sm font-bold">{item.value}</div>
+            </div>
+          ))}
         </div>
       </section>
     </div>

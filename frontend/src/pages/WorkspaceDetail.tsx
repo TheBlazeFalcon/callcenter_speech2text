@@ -112,7 +112,7 @@ const WorkspaceDetail = () => {
               <Upload className="w-4 h-4 mr-2" /> Upload Call
             </Button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-[500px] glass-card border-border/40">
+          <DialogContent className="sm:max-w-[800px] border-border/40 backdrop-blur-sm bg-background/95">
             <DialogHeader>
               <DialogTitle>Upload Call Recording</DialogTitle>
               <DialogDescription>

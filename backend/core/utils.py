@@ -107,3 +107,51 @@ def format_timecode(seconds: float) -> str:
     minutes = int((seconds % 3600) // 60)
     secs = int(seconds % 60)
     return f"[{hours:02d}:{minutes:02d}:{secs:02d}]"
+
+def save_csv(data: dict, output_path: str):
+    """Saves a (possibly nested) dictionary to a flat CSV file."""
+    import csv
+    
+    def flatten_dict(d, parent_key='', sep='_'):
+        items = []
+        for k, v in d.items():
+            new_key = f"{parent_key}{sep}{k}" if parent_key else k
+            if isinstance(v, dict):
+                items.extend(flatten_dict(v, new_key, sep=sep).items())
+            else:
+                items.append((new_key, v))
+        return dict(items)
+
+    flat_data = flatten_dict(data)
+    
+    with open(output_path, 'w', newline='', encoding='utf-8') as f:
+        writer = csv.writer(f)
+        writer.writerow(['Metric', 'Value'])
+        for key, value in flat_data.items():
+            human_key = key.replace('_', ' ').capitalize()
+            writer.writerow([human_key, value])
+
+def save_xlsx(agent_data: dict, project_data: dict, output_path: str):
+    """Saves assessment data to an Excel file with multiple sheets."""
+    import pandas as pd
+    
+    def flatten_dict(d, parent_key='', sep='_'):
+        items = []
+        for k, v in d.items():
+            new_key = f"{parent_key}{sep}{k}" if parent_key else k
+            if isinstance(v, dict):
+                items.extend(flatten_dict(v, new_key, sep=sep).items())
+            else:
+                items.append((new_key, v))
+        return dict(items)
+
+    with pd.ExcelWriter(output_path, engine='openpyxl') as writer:
+        if agent_data:
+            flat_agent = flatten_dict(agent_data)
+            df_agent = pd.DataFrame(list(flat_agent.items()), columns=['Metric', 'Value'])
+            df_agent.to_excel(writer, sheet_name='Agent Assessment', index=False)
+            
+        if project_data:
+            flat_project = flatten_dict(project_data)
+            df_project = pd.DataFrame(list(flat_project.items()), columns=['Metric', 'Value'])
+            df_project.to_excel(writer, sheet_name='Project Assessment', index=False)

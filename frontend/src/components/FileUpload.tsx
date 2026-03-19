@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from "react";
-import { Upload, File, X, CheckCircle2, AlertCircle } from "lucide-react";
+import { Upload, File, X, CheckCircle2, AlertCircle, User, Hash, ChevronDown } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -24,6 +24,7 @@ const FileUpload = ({ workspaceId, workspaceName, onUploadComplete }: FileUpload
   const [state, setState] = useState<UploadState>("idle");
   const [progress, setProgress] = useState(0);
   const [agentId, setAgentId] = useState("");
+  const [isAgentSelectorOpen, setIsAgentSelectorOpen] = useState(false);
   const [projectId, setProjectId] = useState("");
   const [analyses, setAnalyses] = useState<string[]>([
     "transcript",
@@ -98,6 +99,7 @@ const FileUpload = ({ workspaceId, workspaceName, onUploadComplete }: FileUpload
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           filename,
+          workspace_id: workspaceId,
           project_id: projectId || String(workspaceId),
           project_name: workspaceName,
           agent_name: selectedAgent?.name || "Unknown Agent",
@@ -211,29 +213,55 @@ const FileUpload = ({ workspaceId, workspaceName, onUploadComplete }: FileUpload
           {state === "idle" && (
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                <div className="space-y-2 relative">
+                  <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+                    <User className="w-3 h-3" />
                     Select Agent
                   </label>
-                  <select
-                    className="w-full px-3 py-2 text-sm rounded-lg bg-secondary/30 border border-border/50 text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-                    value={agentId}
-                    onChange={(e) => setAgentId(e.target.value)}
-                  >
-                    <option value="">Select an agent...</option>
-                    {agents?.map(a => (
-                      <option key={a.id} value={a.id}>{a.name}</option>
-                    ))}
-                  </select>
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setIsAgentSelectorOpen(!isAgentSelectorOpen)}
+                      className={cn(
+                        "w-full px-3 py-2.5 text-sm rounded-xl bg-secondary/20 border border-border/40 text-left flex items-center justify-between hover:bg-secondary/30 transition-all",
+                        isAgentSelectorOpen && "ring-1 ring-primary border-primary/50"
+                      )}
+                    >
+                      <span className={cn(!agentId && "text-muted-foreground")}>
+                        {agentId ? agents?.find(a => a.id === Number(agentId))?.name : "Choose agent..."}
+                      </span>
+                      <ChevronDown className={cn("w-4 h-4 text-muted-foreground transition-transform", isAgentSelectorOpen && "rotate-180")} />
+                    </button>
+                    
+                    {isAgentSelectorOpen && (
+                      <div className="absolute top-full left-0 right-0 mt-2 z-50 glass-card border-border/40 shadow-xl max-h-48 overflow-y-auto animate-in fade-in zoom-in duration-200">
+                        {agents?.map(a => (
+                          <button
+                            key={a.id}
+                            type="button"
+                            onClick={() => {
+                              setAgentId(String(a.id));
+                              setIsAgentSelectorOpen(false);
+                            }}
+                            className="w-full px-4 py-2.5 text-sm text-left hover:bg-primary/10 transition-colors flex items-center justify-between"
+                          >
+                            {a.name}
+                            {agentId === String(a.id) && <CheckCircle2 className="w-4 h-4 text-primary" />}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
                 <div className="space-y-2">
-                  <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                  <label className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
+                    <Hash className="w-3 h-3" />
                     Project ID
                   </label>
                   <input
                     type="text"
                     placeholder="External ID..."
-                    className="w-full px-3 py-2 text-sm rounded-lg bg-secondary/30 border border-border/50 text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                    className="w-full px-3 py-2.5 text-sm rounded-xl bg-secondary/20 border border-border/40 text-foreground focus:outline-none focus:ring-1 focus:ring-primary focus:border-primary/50 transition-all placeholder:text-muted-foreground/50"
                     value={projectId}
                     onChange={(e) => setProjectId(e.target.value)}
                   />
@@ -245,7 +273,7 @@ const FileUpload = ({ workspaceId, workspaceName, onUploadComplete }: FileUpload
                   <div className="w-1 h-3 bg-primary rounded-full" />
                   Select Analysis Options
                 </label>
-                <div className="grid grid-cols-2 gap-2">
+                <div className="grid grid-cols-4 gap-2">
                   {[
                     { id: "transcript", label: "Transcript" },
                     { id: "summary", label: "Agent Summary" },
@@ -256,21 +284,23 @@ const FileUpload = ({ workspaceId, workspaceName, onUploadComplete }: FileUpload
                       key={type.id}
                       onClick={() => toggleAnalysis(type.id)}
                       className={cn(
-                        "flex items-center gap-2 px-3 py-2.5 rounded-xl border-2 cursor-pointer transition-all active:scale-95",
+                        "flex items-center gap-2 px-3 py-2.5 rounded-xl border transition-all active:scale-[0.98]",
                         analyses.includes(type.id)
-                          ? "bg-primary/5 border-primary shadow-sm text-primary"
-                          : "bg-secondary/10 border-transparent text-muted-foreground hover:bg-secondary/20"
+                          ? "bg-primary/10 border-primary/50 shadow-[0_0_15px_-5px_rgba(var(--primary),0.3)] text-primary"
+                          : "bg-secondary/5 border-border/20 text-muted-foreground hover:bg-secondary/10 hover:border-border/40"
                       )}
                     >
                       <div className={cn(
-                        "w-4 h-4 rounded-full border-2 flex items-center justify-center transition-colors",
-                        analyses.includes(type.id) ? "border-primary bg-primary" : "border-muted-foreground/30"
+                        "w-3.5 h-3.5 rounded-full border flex items-center justify-center transition-all duration-300",
+                        analyses.includes(type.id) 
+                          ? "border-primary bg-primary scale-110 shadow-[0_0_8px_rgba(var(--primary),0.5)]" 
+                          : "border-muted-foreground/30 shadow-none"
                       )}>
                         {analyses.includes(type.id) && (
-                          <div className="w-1.5 h-1.5 rounded-full bg-white shadow-sm" />
+                          <div className="w-1.5 h-1.5 rounded-full bg-white animate-in zoom-in duration-300" />
                         )}
                       </div>
-                      <span className="text-xs font-semibold">{type.label}</span>
+                      <span className="text-[11px] font-bold tracking-tight">{type.label}</span>
                     </div>
                   ))}
                 </div>

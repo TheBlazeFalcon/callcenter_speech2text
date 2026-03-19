@@ -30,7 +30,7 @@ class TranscriptionService:
             # Wait, the new SDK uses client.models.generate_content
             
             # Transcription
-            transcription_prompt = load_prompt("transcription", "darija_transcription")
+            transcription_prompt = load_prompt("transcription", "refined_darija_transcription")
             response = self.client.models.generate_content(
                 model="gemini-2.5-flash",
                 contents=[audio_file, transcription_prompt]

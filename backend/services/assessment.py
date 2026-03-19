@@ -19,7 +19,7 @@ class AssessmentService:
         if not transcript_text or not transcript_text.strip():
             raise ValueError("Transcript is empty")
 
-        system_prompt = load_prompt("agent_assessment", "qa_expert")
+        system_prompt = load_prompt("agent_assessment", "agent_performance_expert")
         start_time = time.time()
         
         response = self.client.models.generate_content(
@@ -60,7 +60,7 @@ class AssessmentService:
             raise ValueError("Transcript is empty")
         
         # 1. Project Notation (Scoring)
-        notation_prompt = load_prompt("project_assessment", "notations")
+        notation_prompt = load_prompt("project_assessment", "innovation_scoring_notations")
         notation_response = self.client.models.generate_content(
             model=self.model_id,
             contents=[notation_prompt, f"Analyze this transcript:\n\n{transcript_text}"]
@@ -75,7 +75,7 @@ class AssessmentService:
             else: raise
         
         # 2. Qualitative Analysis
-        qualitative_prompt = load_prompt("project_assessment", "qualitative")
+        qualitative_prompt = load_prompt("project_assessment", "innovation_qualitative_analysis")
         qualitative_response = self.client.models.generate_content(
             model=self.model_id,
             contents=[qualitative_prompt, f"Analyze this transcript:\n\n{transcript_text}"]

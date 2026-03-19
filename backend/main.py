@@ -9,9 +9,10 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
+from sqlalchemy import func, cast, Integer
 from sqlalchemy.orm import Session
 
-from backend.core.utils import read_docx, get_audio_duration, save_docx, save_json
+from backend.core.utils import get_audio_duration, format_timecode, save_docx, save_csv, save_json, read_docx, save_xlsx
 from backend.services.transcription import TranscriptionService
 from backend.services.assessment import AssessmentService
 from backend.core.database import SessionLocal, engine, get_db, Base
@@ -116,6 +117,7 @@ class Token(BaseModel):
 
 class ProcessRequest(BaseModel):
     filename: str
+    workspace_id: int
     project_id: str
     project_name: str
     agent_name: str
@@ -260,9 +262,8 @@ def run_processing_pipeline(task_id: int, filename: str, metadata: dict):
                 total_cost_usd += 0.005
                 db.commit()
                 
-                if "agent_results" in locals() and "raw_json_path" in agent_results:
-                    # In a real app we might want to save the raw JSON somewhere
-                    pass
+                if agent_results:
+                    save_csv(agent_results, os.path.join(OUTPUTS_DIR, f"{base_name}_agent.csv"))
 
         # 3. Project Assessment
         if "project_analysis" in analyses_to_run:
@@ -284,6 +285,23 @@ def run_processing_pipeline(task_id: int, filename: str, metadata: dict):
                 
                 save_json(json.dumps(project_results.get("project_data"), ensure_ascii=False, indent=2), 
                           os.path.join(OUTPUTS_DIR, f"{base_name}_project_assessment.json"))
+                save_csv(project_results.get("project_data"), os.path.join(OUTPUTS_DIR, f"{base_name}_project.csv"))
+
+        # 4. Final Combined Excel
+        agent_assessment_record = db.query(models.AgentAssessment).filter(models.AgentAssessment.call_id == task_id).first()
+        project_assessment_record = db.query(models.ProjectAssessment).filter(models.ProjectAssessment.call_id == task_id).first()
+        
+        if agent_assessment_record or project_assessment_record:
+            agent_export = {
+                "agent_summary": agent_assessment_record.agent_summary,
+                "final_verdict": agent_assessment_record.final_verdict,
+                "performance": agent_assessment_record.agent_performance,
+                "behavior": agent_assessment_record.behavioral_analysis
+            } if agent_assessment_record else {}
+            
+            project_export = project_assessment_record.project_data if project_assessment_record else {}
+            
+            save_xlsx(agent_export, project_export, os.path.join(OUTPUTS_DIR, f"{base_name}_falcon.xlsx"))
 
         call_record.cost_usd = (call_record.cost_usd or 0.0) + total_cost_usd
         call_record.status = "completed"
@@ -320,35 +338,36 @@ async def get_dashboard_stats(db: Session = Depends(get_db)):
     active_agents = db.query(models.Agent).count()
     workspaces = db.query(models.Workspace).count()
     
-    # Calculate average score from agent assessments
-    avg_score = db.query(models.AgentAssessment.agent_performance["overall_score"]).all()
-    scores = [s[0] for s in avg_score if s[0] is not None]
-    final_avg = sum(scores) / len(scores) if scores else 0
+    # Calculate average score from agent assessments using SQL aggregation
+    avg_score = db.query(
+        func.avg(cast(models.AgentAssessment.agent_performance["overall_score"], Integer))
+    ).scalar() or 0
     
     return {
         "totalCalls": total_calls,
         "activeAgents": active_agents,
         "totalWorkspaces": workspaces,
-        "avgScore": round(final_avg, 1),
+        "avgScore": round(float(avg_score), 1),
         "callsTrend": "+0%", # Placeholder for trend logic
         "scoreTrend": "+0%"
     }
 
 @app.get("/api/workspaces")
 async def list_workspaces(db: Session = Depends(get_db)):
-    workspaces = db.query(models.Workspace).all()
+    # Optimized query to get all workspace data including counts and avg score in one go
+    # Using SQL aggregation and outer joins to avoid N+1 problem
+    workspaces_data = db.query(
+        models.Workspace,
+        func.count(models.Agent.id.distinct()).label("agent_count"),
+        func.count(models.Call.id.distinct()).label("call_count"),
+        func.avg(cast(models.AgentAssessment.agent_performance["overall_score"], Integer)).label("avg_score")
+    ).outerjoin(models.Agent, models.Workspace.id == models.Agent.workspace_id)\
+     .outerjoin(models.Call, models.Workspace.id == models.Call.workspace_id)\
+     .outerjoin(models.AgentAssessment, models.Call.id == models.AgentAssessment.call_id)\
+     .group_by(models.Workspace.id).all()
+
     result = []
-    for ws in workspaces:
-        agent_count = db.query(models.Agent).filter(models.Agent.workspace_id == ws.id).count()
-        call_count = db.query(models.Call).filter(models.Call.workspace_id == ws.id).count()
-        
-        # Avg score for workspace
-        avg_score_query = db.query(models.AgentAssessment.agent_performance["overall_score"])\
-            .join(models.Call, models.AgentAssessment.call_id == models.Call.id)\
-            .filter(models.Call.workspace_id == ws.id).all()
-        scores = [s[0] for s in avg_score_query if s[0] is not None]
-        avg_score = round(sum(scores) / len(scores), 1) if scores else 0
-        
+    for ws, agent_count, call_count, avg_score in workspaces_data:
         result.append({
             "id": str(ws.id),
             "name": ws.name,
@@ -356,7 +375,7 @@ async def list_workspaces(db: Session = Depends(get_db)):
             "status": ws.status,
             "agentCount": agent_count,
             "callCount": call_count,
-            "avgScore": avg_score
+            "avgScore": round(float(avg_score or 0), 1)
         })
     return result
 
@@ -372,7 +391,7 @@ async def create_workspace(request: WorkspaceCreate, db: Session = Depends(get_d
     return new_ws
 
 @app.put("/api/workspaces/{workspace_id}")
-async def update_workspace(workspace_id: uuid.UUID, request: WorkspaceUpdate, db: Session = Depends(get_db)):
+async def update_workspace(workspace_id: int, request: WorkspaceUpdate, db: Session = Depends(get_db)):
     ws = db.query(models.Workspace).filter(models.Workspace.id == workspace_id).first()
     if not ws:
         raise HTTPException(status_code=404, detail="Workspace not found")
@@ -404,22 +423,22 @@ async def get_workspace(workspace_id: int, db: Session = Depends(get_db)):
 
 @app.get("/api/calls")
 async def list_calls(project_id: Optional[str] = None, agent_id: Optional[int] = None, db: Session = Depends(get_db)):
-    query = db.query(models.Call)
+    # Optimized query to get calls with agent and agent assessment in one go
+    query = db.query(
+        models.Call,
+        models.Agent.name.label("agent_name"),
+        cast(models.AgentAssessment.agent_performance["overall_score"], Integer).label("score")
+    ).outerjoin(models.Agent, models.Call.agent_id == models.Agent.id)\
+     .outerjoin(models.AgentAssessment, models.Call.id == models.AgentAssessment.call_id)
+    
     if project_id:
         query = query.filter(models.Call.project_id == project_id)
     if agent_id:
         query = query.filter(models.Call.agent_id == agent_id)
     
-    calls = query.all()
+    calls_data = query.all()
     result = []
-    for call in calls:
-        agent_assessment = db.query(models.AgentAssessment).filter(models.AgentAssessment.call_id == call.id).first()
-        score = 0
-        if agent_assessment and agent_assessment.agent_performance:
-            score = agent_assessment.agent_performance.get("overall_score", 0)
-        
-        agent = db.query(models.Agent).filter(models.Agent.id == call.agent_id).first()
-        
+    for call, agent_name, score in calls_data:
         result.append({
             "id": call.id,
             "title": call.title,
@@ -427,46 +446,61 @@ async def list_calls(project_id: Optional[str] = None, agent_id: Optional[int] =
             "status": call.status,
             "duration": f"{int(call.duration_seconds//60)}m {int(call.duration_seconds%60)}s" if call.duration_seconds else "—",
             "date": call.created_at.strftime("%Y-%m-%d"),
-            "agent": agent.name if agent else "Unknown",
-            "score": score,
+            "agent": agent_name or "Unknown",
+            "score": int(score) if score else 0,
             "projectId": call.project_id
+        })
+    return result
+
+@app.get("/api/workspaces/{workspace_id}/calls")
+async def list_workspace_calls(workspace_id: int, db: Session = Depends(get_db)):
+    # Optimized query specifically for workspace calls
+    calls_data = db.query(
+        models.Call,
+        models.Agent.name.label("agent_name"),
+        cast(models.AgentAssessment.agent_performance["overall_score"], Integer).label("score")
+    ).outerjoin(models.Agent, models.Call.agent_id == models.Agent.id)\
+     .outerjoin(models.AgentAssessment, models.Call.id == models.AgentAssessment.call_id)\
+     .filter(models.Call.workspace_id == workspace_id).all()
+    
+    result = []
+    for call, agent_name, score in calls_data:
+        result.append({
+            "id": call.id,
+            "title": call.title,
+            "filename": call.filename,
+            "status": call.status,
+            "duration": f"{int(call.duration_seconds//60)}m {int(call.duration_seconds%60)}s" if call.duration_seconds else "—",
+            "date": call.created_at.strftime("%Y-%m-%d"),
+            "agent": agent_name or "Unknown",
+            "score": int(score) if score else 0
         })
     return result
 
 @app.get("/api/agents")
 async def list_agents(db: Session = Depends(get_db)):
-    agents = db.query(models.Agent).all()
-    result = []
-    for agent in agents:
-        call_count = db.query(models.Call).filter(models.Call.agent_id == agent.id).count()
-        
-        # Avg score for agent
-        avg_score_query = db.query(models.AgentAssessment.agent_performance["overall_score"])\
-            .join(models.Call, models.AgentAssessment.call_id == models.Call.id)\
-            .filter(models.Call.agent_id == agent.id).all()
-        scores = [s[0] for s in avg_score_query if s[0] is not None]
-        avg_score = round(sum(scores) / len(scores), 1) if scores else 0
-        
-        # Avg duration
-        durations = db.query(models.Call.duration_seconds).filter(models.Call.agent_id == agent.id).all()
-        d_vals = [d[0] for d in durations if d[0] is not None]
-        avg_dur = round(sum(d_vals) / len(d_vals), 0) if d_vals else 0
-        
-        # Simple trend logic (placeholder)
-        trend = "stable"
-        if len(scores) >= 2:
-            if scores[-1] > scores[-2]: trend = "up"
-            elif scores[-1] < scores[-2]: trend = "down"
+    # Optimized query to get all agent data including call count and avg score in one go
+    agents_data = db.query(
+        models.Agent,
+        func.count(models.Call.id).label("call_count"),
+        func.avg(cast(models.AgentAssessment.agent_performance["overall_score"], Integer)).label("avg_score"),
+        func.avg(models.Call.duration_seconds).label("avg_duration")
+    ).outerjoin(models.Call, models.Agent.id == models.Call.agent_id)\
+     .outerjoin(models.AgentAssessment, models.Call.id == models.AgentAssessment.call_id)\
+     .group_by(models.Agent.id).all()
 
+    result = []
+    for agent, call_count, avg_score, avg_dur in agents_data:
+        avg_dur_val = float(avg_dur or 0)
         result.append({
             "id": agent.id,
             "name": agent.name,
             "role": agent.role,
             "avatar": agent.name[0] if agent.name else "?",
-            "score": avg_score,
+            "score": round(float(avg_score or 0), 1),
             "callCount": call_count,
-            "avgDuration": f"{int(avg_dur//60)}m {int(avg_dur%60)}s",
-            "trend": trend
+            "avgDuration": f"{int(avg_dur_val//60)}m {int(avg_dur_val%60)}s",
+            "trend": "stable" # Simplified for optimization, could be added with window function if needed
         })
     return result
 
@@ -484,14 +518,14 @@ async def create_agent(request: AgentCreate, db: Session = Depends(get_db)):
     return new_agent
 
 @app.get("/api/agents/{agent_id}")
-async def get_agent(agent_id: uuid.UUID, db: Session = Depends(get_db)):
+async def get_agent(agent_id: int, db: Session = Depends(get_db)):
     agent = db.query(models.Agent).filter(models.Agent.id == agent_id).first()
     if not agent:
         raise HTTPException(status_code=404, detail="Agent not found")
     return agent
 
 @app.put("/api/agents/{agent_id}")
-async def update_agent(agent_id: uuid.UUID, request: AgentUpdate, db: Session = Depends(get_db)):
+async def update_agent(agent_id: int, request: AgentUpdate, db: Session = Depends(get_db)):
     agent = db.query(models.Agent).filter(models.Agent.id == agent_id).first()
     if not agent:
         raise HTTPException(status_code=404, detail="Agent not found")
@@ -506,7 +540,7 @@ async def update_agent(agent_id: uuid.UUID, request: AgentUpdate, db: Session = 
     return agent
 
 @app.delete("/api/agents/{agent_id}")
-async def delete_agent(agent_id: uuid.UUID, db: Session = Depends(get_db)):
+async def delete_agent(agent_id: int, db: Session = Depends(get_db)):
     agent = db.query(models.Agent).filter(models.Agent.id == agent_id).first()
     if not agent:
         raise HTTPException(status_code=404, detail="Agent not found")
@@ -516,7 +550,7 @@ async def delete_agent(agent_id: uuid.UUID, db: Session = Depends(get_db)):
     return {"message": "Agent deleted successfully"}
 
 @app.get("/api/agents/{agent_id}/calls")
-async def list_agent_calls(agent_id: uuid.UUID, db: Session = Depends(get_db)):
+async def list_agent_calls(agent_id: int, db: Session = Depends(get_db)):
     calls_query = db.query(models.Call).filter(models.Call.agent_id == agent_id).all()
     result = []
     for call in calls_query:
@@ -554,24 +588,33 @@ async def process_file(request: ProcessRequest, background_tasks: BackgroundTask
     call_record = db.query(models.Call).filter(models.Call.filename == request.filename).first()
     
     if call_record:
-        task_id = call_record.id
         call_record.status = "pending"
         call_record.error_message = None
+        call_record.workspace_id = request.workspace_id
+        call_record.project_id = request.project_id
+        call_record.agent_id = request.agent_id
+        call_record.selected_analyses = request.analyses
         db.commit()
+        task_id = call_record.id
     else:
-        task_id = uuid.uuid4()
         # Create Call record
         call_record = models.Call(
-            id=task_id,
             title=f"Analysis of {request.filename}",
             filename=request.filename,
             original_path=os.path.join(AUDIO_DIR, request.filename),
-            status="pending"
+            status="pending",
+            workspace_id=request.workspace_id,
+            project_id=request.project_id,
+            agent_id=request.agent_id,
+            selected_analyses=request.analyses
         )
         db.add(call_record)
         db.commit()
+        db.refresh(call_record)
+        task_id = call_record.id
     
     metadata = {
+        "workspace_id": request.workspace_id,
         "project_id": request.project_id,
         "project_name": request.project_name,
         "agent_name": request.agent_name,

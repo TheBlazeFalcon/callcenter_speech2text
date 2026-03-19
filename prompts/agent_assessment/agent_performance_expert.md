@@ -93,6 +93,7 @@ Return ONLY valid JSON matching exactly this structure:
     "empathy": 0,
     "script_adherence": 0,
     "response_time": 0,
+    "overall_score": 0
   },
   "behavioral_analysis": {
     "sentiment": "string (e.g., Positive, Frustrated, Neutral)",

@@ -19,6 +19,7 @@
     "Do not normalize to Modern Standard Arabic",
     "Maintain exact dialectal spelling for Darija in Arabic script",
     "Maintain French/English terms in Latin script",
-    "Keep all fillers and mid-sentence script changes"
+    "Clean the transcript: Remove all filler words (ah, uh, mhm, euh, etc.) to ensure a professional and readable text",
+    "Maintain mid-sentence script changes but do not keep stammers or false starts"
   ]
 }

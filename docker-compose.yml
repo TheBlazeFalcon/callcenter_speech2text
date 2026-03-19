@@ -1,5 +1,6 @@
 services:
   app:
+    container_name: falcon-app
     build: .
     image: speech2text:latest
     restart: always
@@ -7,7 +8,7 @@ services:
       - .env
     environment:
       - PORT=8000
-      - DB_HOST=db
+      - DB_HOST=falcon-db
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.speech2text.rule=Host(`${DOMAIN:-localhost}`)"
@@ -15,6 +16,7 @@ services:
       - "traefik.http.routers.speech2text.tls.certresolver=letsencrypt"
       - "traefik.http.services.speech2text.loadbalancer.server.port=8000"
     volumes:
+      - ./backend:/app/backend
       - ./audio:/app/audio
       - ./outputs:/app/outputs
     healthcheck:
@@ -29,6 +31,7 @@ services:
       - db
 
   db:
+    container_name: falcon-db
     image: postgres:16-alpine
     restart: always
     environment:
