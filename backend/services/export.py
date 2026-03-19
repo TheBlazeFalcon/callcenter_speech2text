@@ -39,54 +39,59 @@ class ExportService:
         call_summary = data.get("call_summary", "")
         final_verdict = data.get("final_verdict", "")
         performance = data.get("agent_performance", {})
-        for criterion, rating in performance.items():
+        for criterion, score in performance.items():
             rows.append({
-                "Criterion": criterion.replace('_', ' ').capitalize(),
-                "Rating": rating,
+                "Criterion": criterion.replace('_', ' ').title(),
+                "Score": score,
                 "Final Verdict": final_verdict,
                 "Call Summary": call_summary
             })
         return pd.DataFrame(rows)
 
+    def process_quantitative(self, data: Dict) -> pd.DataFrame:
+        quant = data.get("quantitative", {})
+        if not quant:
+            return pd.DataFrame()
+        return pd.DataFrame([{k.replace('_', ' ').title(): v for k, v in quant.items()}])
+
+    def process_qualitative_observations(self, data: Dict) -> pd.DataFrame:
+        observations = data.get("qualitative_observations", [])
+        if not observations:
+            return pd.DataFrame()
+        return pd.DataFrame([{"Tag": o.get("tag", ""), "Observation": o.get("text", "")} for o in observations])
+
+    def _auto_width(self, writer, sheet_name: str):
+        worksheet = writer.sheets[sheet_name]
+        for col in worksheet.columns:
+            max_length = 0
+            column = col[0].column_letter
+            for cell in col:
+                try:
+                    if len(str(cell.value)) > max_length:
+                        max_length = len(str(cell.value))
+                except:
+                    pass
+            worksheet.column_dimensions[column].width = min(max_length + 2, 50)
+
     def export_to_excel(self, base_name: str) -> str:
-        files = {
-            "Quantitative": f"{base_name}_notations.json",
-            "Qualitative": f"{base_name}_qualitative.json",
-            "Agent Assessment": f"{base_name}_assessment.json"
-        }
+        assessment_path = os.path.join(self.outputs_dir, f"{base_name}_assessment.json")
         output_path = os.path.join(self.outputs_dir, f"{base_name}_final_assessment.xlsx")
-        
+
+        if not os.path.exists(assessment_path):
+            return output_path
+
+        with open(assessment_path, 'r') as f:
+            data = json.load(f)
+
         with pd.ExcelWriter(output_path, engine='openpyxl') as writer:
-            for sheet_name, filename in files.items():
-                file_path = os.path.join(self.outputs_dir, filename)
-                if not os.path.exists(file_path):
-                    continue
-                
-                with open(file_path, 'r') as f:
-                    data = json.load(f)
-                    
-                if sheet_name == "Quantitative":
-                    df = self.process_notations(data)
-                elif sheet_name == "Qualitative":
-                    df = self.process_qualitative(data)
-                elif sheet_name == "Agent Assessment":
-                    df = self.process_agent_assessment(data)
-                else:
-                    df = pd.DataFrame()
-                    
+            sheets = {
+                "Agent Performance": self.process_agent_assessment(data),
+                "Quantitative": self.process_quantitative(data),
+                "Qualitative Observations": self.process_qualitative_observations(data),
+            }
+            for sheet_name, df in sheets.items():
                 if not df.empty:
                     df.to_excel(writer, sheet_name=sheet_name, index=False)
-                    # Simple column width adjustment
-                    worksheet = writer.sheets[sheet_name]
-                    for col in worksheet.columns:
-                        max_length = 0
-                        column = col[0].column_letter
-                        for cell in col:
-                            try:
-                                if len(str(cell.value)) > max_length:
-                                    max_length = len(str(cell.value))
-                            except:
-                                pass
-                        adjusted_width = (max_length + 2)
-                        worksheet.column_dimensions[column].width = min(adjusted_width, 50)
+                    self._auto_width(writer, sheet_name)
+
         return output_path
