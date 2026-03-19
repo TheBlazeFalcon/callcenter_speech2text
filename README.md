@@ -1,52 +1,81 @@
-# Falcon Call AI 🦅
+# Falcon Call AI 🦅 | Intelligent Analysis Platform
 
-**Falcon Call AI** is an advanced intelligence platform for transcribing and analyzing call center interactions. Powered by **Google Gemini 1.5**, it provides modular, deep actionable insights through automated transcription, project-level qualitative assessments, and agent performance scoring.
+**Falcon Call AI** is a state-of-the-art intelligence platform designed to transform call center recordings into structured, actionable insights. Leveraging **Google Gemini 2.0/2.5 Flash**, the system provides multimodal transcription, deep project assessments, and granular agent performance analytics.
 
 ## ✨ Core Features
 
-- **Gemini 1.5 Intelligence**: Automated transcription and analysis using `gemini-1.5-flash` for high-speed, cost-effective processing.
-- **Modular Analysis Pipeline**: Choose specific analyses during upload, including Transcription, Summary, Project Analysis, and Agent Performance.
-- **Detailed Scorecards**: Comprehensive agent evaluations with behavioral sentiment, tone analysis, and performance metrics.
-- **Contextual Assessments**: Separation between agent-specific performance and project-level qualitative observations.
-- **Workflow-Focused UI**: Modern React dashboard designed for quality control managers and call center leads.
+### 🎙️ Advanced Transcription
 
-## 🚀 Quick Start
+- **Darija Support**: Specialized multimodal analysis for Moroccan Arabic (Darija) and hybrid dialects.
+- **Filler Word Filtering**: Automated removal of "ah", "uh", "mhm" for clean, readable interaction logs.
+- **Sticky Timestamps**: Precise time-tracking for every dialogue turn.
+
+### 📊 Dual-Layer Assessment
+
+- **Project Assessment (Innovation Focused)**:
+  - **Scoring**: Quantitative evaluation across Idea, Team, and Pilot potential.
+  - **Qualitative**: Strategic fit, MVP budgeting, lead time, and team skill gap analysis.
+- **Agent Assessment (Quality Assurance)**:
+  - **Metrics**: 0-100 scoring on Communication, Empathy, Problem Resolution, and Script Adherence.
+  - **Behavioral Analysis**: Sentiment tracking, tone detection, and keyword extraction.
+
+### 📥 Multi-Format Exports
+
+- **Combined Excel (.xlsx)**: Comprehensive multi-sheet reports for stakeholders.
+- **Interaction Word (.docx)**: Cleaned transcript and summary for archival.
+- **Data CSV (.csv)**: Raw assessment data for integration with external BI tools.
+
+### 🏢 Enterprise Management
+
+- **Workspaces**: Hierarchical organization of calls and projects.
+- **Agent Profiles**: Performance history and trend tracking for quality coaching.
+
+## 🚀 Quick Start (Docker Preferred)
+
+The easiest way to run Falcon Call AI is via Docker Compose:
 
 1. **Configure Environment**:
    Create a `.env` file in the root:
 
    ```env
    GEMINI_API_KEY=your_key_here
-   INITIAL_ADMIN_EMAIL=admin@falconcall.ai
-   INITIAL_ADMIN_PASSWORD=your_password
+   USD_MAD_RATE=10.12
    ```
 
-2. **Initialize System**:
-   Setup the database schema and seed initial data (Admin, Mouvement workspace, and default agents):
+2. **Launch with Docker**:
 
    ```bash
-   PYTHONPATH=. python3 scripts/reset_db.py
+   docker compose up --build
    ```
 
-3. **Launch Application**:
+   The application will be available at `http://localhost:3000`.
+
+## 🛠 Manual Installation
+
+1. **Backend (Python 3.10+)**:
 
    ```bash
-   # Backend
+   pip install -r requirements.txt
+   PYTHONPATH=. python3 scripts/reset_db.py  # Initialize DB
    uvicorn backend.main:app --reload
+   ```
 
-   # Frontend
+2. **Frontend (Node 18+)**:
+
+   ```bash
    cd frontend
+   npm install
    npm run dev
    ```
 
-## 🛠 Project Structure
+## 🏗 Architecture & Tech Stack
 
-- **`backend/`**: Modular FastAPI application.
-  - **`core/`**: Database models (SQLAlchemy), auth, and utilities.
-  - **`services/`**: Transcription and Intelligence assessment services.
-- **`frontend/`**: Vite-powered React application with Tailwind CSS.
-- **`scripts/`**: Maintenance and system initialization scripts.
-- **`prompts/`**: Structured AI personas for precise assessments.
+- **Frontend**: React 18, Vite, Tailwind CSS, Lucide Icons, Shadcn UI.
+- **Backend**: FastAPI (Python), SQLAlchemy ORM, Pydantic 2.0.
+- **AI Core**: Google Generative AI SDK (Gemini Flash), Custom Prompt Management System.
+- **Database**: PostgreSQL with JSONB support for complex assessment structures.
+- **Storage**: Organized `outputs/` directory for generated artifacts (CSV, XLSX, DOCX).
 
 ---
-*Falcon Call AI - Modular Intelligence. Precise Assessment. Real-time Analytics.*
+
+*Falcon Call AI - Precise Assessment. Intelligent Analysis. Real-time Impact.*
