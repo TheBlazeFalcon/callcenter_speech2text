@@ -1,0 +1,40 @@
+services:
+  app:
+    container_name: falcon-app-local
+    build: .
+    image: speech2text:latest
+    restart: always
+    env_file:
+      - .env
+    environment:
+      - PORT=8000
+      - DB_HOST=falcon-db-local
+    volumes:
+      - ./backend:/app/backend
+      - ./audio:/app/audio
+      - ./outputs:/app/outputs
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:8000/health" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+
+  db:
+    container_name: falcon-db-local
+    image: postgres:16-alpine
+    restart: always
+    environment:
+      - POSTGRES_USER=${DB_USER:-postgres}
+      - POSTGRES_PASSWORD=${DB_PASSWORD:-postgres}
+      - POSTGRES_DB=${DB_NAME:-falconcall}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data_local:/var/lib/postgresql/data
+
+volumes:
+  postgres_data_local:

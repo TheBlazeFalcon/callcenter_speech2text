@@ -32,7 +32,7 @@
 
 ## 🚀 Quick Start (Docker Preferred)
 
-The easiest way to run Falcon Call AI is via Docker Compose:
+The easiest way to run Falcon Call AI locally is via Docker Compose:
 
 1. **Configure Environment**:
    Create a `.env` file in the root:
@@ -45,10 +45,30 @@ The easiest way to run Falcon Call AI is via Docker Compose:
 2. **Launch with Docker**:
 
    ```bash
-   docker compose up --build
+   # Run with local settings (ports 8000/5432 exposed)
+   docker compose -f docker-compose.local.yml up --build
    ```
 
-   The application will be available at `http://localhost:3000`.
+   The application will be available at `http://localhost:8000`.
+
+## 🌐 Deployment (Dokploy & Traefik)
+
+Falcon Call AI is optimized for deployment using [Dokploy](https://dokploy.com/) and [Traefik](https://doc.traefik.io/traefik/).
+
+1. **Production Configuration**:
+   The `docker-compose.prod.yml` file is configured for production environments:
+   - Secured: No database ports exposed to the host.
+   - Persistent: Uses named volumes for audio, outputs, and database data.
+   - Routed: Traefik labels for automatic SSL and domain routing.
+
+2. **Environment Variables**:
+   Ensure the following are set in your Dokploy project:
+   - `DOMAIN`: Your application domain (e.g., `falcon.example.com`).
+   - `GEMINI_API_KEY`: Your Google Gen AI key.
+   - `DB_USER`, `DB_PASSWORD`, `DB_NAME`: Database credentials.
+
+3. **Dokploy Setup**:
+   Create a "Compose" application in Dokploy and point it to this repository, specifying `docker-compose.prod.yml` as the compose file.
 
 ## 🛠 Manual Installation
 

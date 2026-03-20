@@ -9,24 +9,22 @@ services:
     environment:
       - PORT=8000
       - DB_HOST=falcon-db
+      - DB_PORT=5432
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.speech2text.rule=Host(`${DOMAIN:-localhost}`)"
-      - "traefik.http.routers.speech2text.entrypoints=websecure"
-      - "traefik.http.routers.speech2text.tls.certresolver=letsencrypt"
-      - "traefik.http.services.speech2text.loadbalancer.server.port=8000"
+      - "traefik.http.routers.falcon-app.rule=Host(`${DOMAIN}`)"
+      - "traefik.http.routers.falcon-app.entrypoints=websecure"
+      - "traefik.http.routers.falcon-app.tls.certresolver=letsencrypt"
+      - "traefik.http.services.falcon-app.loadbalancer.server.port=8000"
     volumes:
-      - ./backend:/app/backend
-      - ./audio:/app/audio
-      - ./outputs:/app/outputs
+      - audio_data:/app/audio
+      - outputs_data:/app/outputs
     healthcheck:
       test: [ "CMD", "curl", "-f", "http://localhost:8000/health" ]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 40s
-    ports:
-      - "${PORT:-8000}:8000"
     depends_on:
       - db
 
@@ -38,10 +36,11 @@ services:
       - POSTGRES_USER=${DB_USER:-postgres}
       - POSTGRES_PASSWORD=${DB_PASSWORD:-postgres}
       - POSTGRES_DB=${DB_NAME:-falconcall}
-    ports:
-      - "${DB_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    # Port 5432 is NOT exposed in production for security
 
 volumes:
   postgres_data:
+  audio_data:
+  outputs_data:

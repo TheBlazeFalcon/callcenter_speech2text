@@ -10,10 +10,16 @@ RUN npm run build
 FROM python:3.11-slim
 WORKDIR /app
 
-# Install curl for healthcheck
+# Install curl for healthcheck and ffmpeg for audio processing
 RUN apt-get update && apt-get install -y \
     curl \
+    ffmpeg \
     && rm -rf /var/lib/apt/lists/*
+
+# Create a non-root user
+RUN useradd -m falconuser && \
+    mkdir -p /app/audio /app/outputs && \
+    chown -R falconuser:falconuser /app
 
 # Copy requirements and install
 COPY requirements.txt .
@@ -24,6 +30,12 @@ COPY . .
 
 # Copy built frontend from stage 1
 COPY --from=frontend-builder /app/frontend/dist ./frontend/dist
+
+# Ensure permissions for the non-root user
+RUN chown -R falconuser:falconuser /app
+
+# Switch to non-root user
+USER falconuser
 
 # Expose the port FastAPI will run on
 EXPOSE 8000
