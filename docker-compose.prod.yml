@@ -12,7 +12,7 @@ services:
       - DB_PORT=5432
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.falcon-app.rule=Host(`${DOMAIN}`)"
+      - "traefik.http.routers.falcon-app.rule=Host(`${APP_DOMAIN}`)"
       - "traefik.http.routers.falcon-app.entrypoints=websecure"
       - "traefik.http.routers.falcon-app.tls.certresolver=letsencrypt"
       - "traefik.http.services.falcon-app.loadbalancer.server.port=8000"

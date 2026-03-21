@@ -87,9 +87,23 @@ seed_data()
 app = FastAPI(title="Falcon Call AI")
 
 # Enable CORS
+origins = [
+    "http://localhost:5173",
+    "http://localhost:8000",
+]
+
+app_domain = os.getenv("APP_DOMAIN")
+if app_domain:
+    origins.extend([
+        f"https://{app_domain}",
+        f"http://{app_domain}",
+        f"https://{app_domain.replace('api.', '')}",
+        f"http://{app_domain.replace('api.', '')}"
+    ])
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=origins if app_domain else ["*"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
